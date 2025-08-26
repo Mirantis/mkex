@@ -1,0 +1,41 @@
+- name: Write Docker daemon config file to remote hosts
+  ansible.builtin.import_playbook: mcr-setup-docker.yml
+
+- name: Open required MKE ports
+  gather_facts: false
+  hosts: all
+  tasks:
+    - ansible.builtin.include_tasks: tasks/mke-open-ports-tasks.yml
+
+- name: Init Swarm cluster control plane
+  hosts: managers
+  gather_facts: false
+  vars_files:
+    - common-vars.yml
+  tasks:
+    - ansible.builtin.include_tasks: tasks/swarm-init-tasks.yml
+
+- name: Write MKE config file to remote hosts
+  hosts: managers
+  gather_facts: false
+  vars_files:
+    - vars/common-vars.yml
+  tasks:
+    - ansible.builtin.include_tasks: tasks/mke-toml-config.yml
+  become: true
+
+- name: Add workers to Swarm cluster
+  gather_facts: false
+  hosts: workers
+  vars_files:
+    - common-vars.yml
+  tasks:
+    - ansible.builtin.include_tasks: tasks/swarm-join-workers-tasks.yml
+
+- name: Install MKE
+  hosts: managers
+  vars_files:
+    - vars/common-vars.yml
+    - vars/mke-creds.yml
+  tasks:
+    - ansible.builtin.include_tasks: tasks/mke-install-tasks.yml

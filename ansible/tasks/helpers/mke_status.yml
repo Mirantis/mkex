@@ -1,0 +1,9 @@
+- name: Verify MKE is healthy
+  ansible.builtin.uri:
+    url: https://localhost:443/_ping
+    validate_certs: false
+    status_code: 200
+  until: mke_status.status == 200
+  retries: 24 # Retries for 24 * 5 seconds = 120 seconds = 2 minutes
+  delay: 5 #
+  register: mke_status

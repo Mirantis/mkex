@@ -1,0 +1,25 @@
+- ansible.builtin.include_tasks: tasks/helpers/mke_status.yml
+
+- name: Get MKE cluster ID
+  ansible.builtin.shell: docker info --format {% raw %}'{{ .Swarm.Cluster.ID }}'{% endraw %}
+  register: mke_id
+  run_once: true
+
+- name: Run MKE upgrade container
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --security-opt
+      - label=disable
+      - -v
+      - /var/run/docker.sock:/var/run/docker.sock
+      - "mirantis/ucp:{{ target_mke_version.stdout }}"
+      - upgrade
+      - --id
+      - "{{ mke_id.stdout }}"
+      - "{{ mke_upgrade_flags | join(' ') }}"
+  run_once: true
+
+- ansible.builtin.include_tasks: tasks/helpers/mke_status.yml

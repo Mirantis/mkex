@@ -1,0 +1,40 @@
+- ansible.builtin.include_tasks: tasks/helpers/docker_folder_exists.yml
+
+- name: Check if the Docker daemon config file exists
+  stat:
+    path: "{{ docker_daemon_config_dst }}"
+  register: docker_daemon_config_stat
+  ignore_errors: true
+
+- name: Slurp docker daemon json
+  ansible.builtin.slurp:
+    src: /etc/docker/daemon.json
+  register: docker_daemon_json
+  when: docker_daemon_config_stat is defined and docker_daemon_config_stat.stat.exists
+
+- name: Register decoded Docker daemon json content
+  set_fact:
+    decoded_docker_daemon_json: "{{ docker_daemon_json['content'] | b64decode }}"
+  when: docker_daemon_json is defined and docker_daemon_json['content'] is defined
+
+- name: Set the data-root value from the docker daemon json
+  set_fact:
+    docker_data_root_value: "{{ decoded_docker_daemon_json['data-root'] }}"
+  when: decoded_docker_daemon_json is defined and decoded_docker_daemon_json['data-root'] is defined
+
+- name: Set the default docker data root
+  set_fact:
+    default_docker_data_root: "/var/lib/docker"
+
+- name: Determine the final value of docker_data_root
+  set_fact:
+    final_docker_data_root: "{{ docker_data_root_value if docker_data_root_value is defined else default_docker_data_root }}"
+
+- name: Copy over the MCR license
+  become: true
+  ansible.builtin.copy:
+    content: "{{ mcr_license }}"
+    dest: "{{ final_docker_data_root }}/docker.lic"
+    mode: "0644"
+  when: mcr_license is defined and mcr_license != ""
+  notify: Restart docker

@@ -1,0 +1,21 @@
+# MKE Upgrade flags
+# Use this flag to force the minimum system requirements for MKE installation whenever your machine is
+# below the minimum requirements, less than 8GB RAM and 40GB hard disk. This flag is useful for testing mainly.
+# More on the subject read here: https://docs.mirantis.com/mke/3.7/install/system-requirements.html
+mke_upgrade_flags: ["--force-minimums"]
+# if not empty, then the url can be used to replace any machine ostree repo remotes
+# ostree_repo_url: "https://get.mirantis.com/mkex-ostree/build/ostree/repo/"
+
+# Number of nodes that get upgraded in parallel
+upgrade_worker_batch_size: 3
+
+
+# URL of the remote OSTree repository
+ostree_repo_url: "https://get.mirantis.com/mkex/ostree"
+
+# Name of the remote OSTree repository
+ostree_remote_name: "mkex"
+
+# Name of the OSTree branch
+# If empty, then current OSTree branch will be used (the one that is currently configured on machines)
+ostree_ref_name: ''

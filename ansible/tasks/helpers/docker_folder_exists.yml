@@ -1,0 +1,6 @@
+- name: Ensure the docker daemon folder exists
+  become: true
+  ansible.builtin.file:
+    path: "{{ docker_daemon_config_dst | dirname }}"
+    state: directory
+    mode: "0755"

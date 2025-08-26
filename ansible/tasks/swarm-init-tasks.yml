@@ -1,0 +1,21 @@
+- ansible.builtin.include_tasks: tasks/helpers/swarm_status.yml
+
+- name: Init Swarm on one of the managers
+  ansible.builtin.shell: docker swarm init | grep join -m 1 | sed -e 's/^[ \t]*//'
+  when: inventory_hostname in main_manager and swarm_status.stdout == 'inactive'
+  run_once: true
+
+- name: Generate join command for workers
+  ansible.builtin.shell: docker swarm join-token worker | grep join | sed -e 's/^[ \t]*//'
+  when: inventory_hostname in main_manager
+  run_once: true
+  register: worker_join_command
+
+- name: Join swarm from all managers as workers
+  ansible.builtin.shell: "{{ hostvars[main_manager]['worker_join_command'].stdout }}"
+  when: inventory_hostname not in main_manager and inventory_hostname in groups['managers'] and swarm_status.stdout == 'inactive'
+
+- name: Promote to manager
+  delegate_to: "{{ main_manager }}"
+  ansible.builtin.shell: "docker node promote {{ inventory_hostname }}"
+  when: inventory_hostname not in main_manager and inventory_hostname in groups['managers'] and swarm_status.stdout == 'inactive'

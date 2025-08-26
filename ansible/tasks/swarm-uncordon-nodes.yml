@@ -1,0 +1,24 @@
+- name: Docker Swarm set nodes to Active state
+  delegate_to: "{{ main_manager }}"
+  ansible.builtin.shell: docker node update --availability active {{ inventory_hostname }}
+
+- ansible.builtin.include_tasks: tasks/helpers/swarm_status.yml
+
+- name: Verify swarm status on with retry
+  ansible.builtin.assert:
+    that:
+      - swarm_status.stdout is defined
+      - swarm_status.stdout == 'active'
+    fail_msg: "Swarm status is not set to 'active"
+    success_msg: "Swarm status is 'active'"
+  until: swarm_status.stdout == 'active'
+  retries: 5
+  delay: 10
+
+- name: Retry until k8s 10250 port is open on 'worker'
+  ansible.builtin.wait_for:
+    host: "{{ inventory_hostname }}"
+    port: 10250
+    state: started
+    delay: 10
+    timeout: 60

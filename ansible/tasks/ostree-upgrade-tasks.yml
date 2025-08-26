@@ -1,0 +1,23 @@
+- name: Get current ref
+  ansible.builtin.shell: ostree refs "{{ ostree_remote_name }}:"
+  register: current_ref
+
+- name: Switch OSTree branches
+  ansible.builtin.shell: rpm-ostree rebase "{{ ostree_remote_name }}:{{ ostree_ref_name }}"
+  become: true
+  when: "current_ref.stdout != ([ostree_remote_name, ostree_ref_name] | join(':')) and ostree_ref_name != ''"
+
+- name: Run rpm-ostree update
+  ansible.builtin.shell: rpm-ostree update
+  become: true
+  when: "current_ref.stdout == ([ostree_remote_name, ostree_ref_name] | join(':')) or ostree_ref_name == ''"
+
+- name: Reboot machine
+  ansible.builtin.reboot:
+    reboot_command: systemctl reboot
+  become: true
+
+- ansible.builtin.include_tasks: tasks/helpers/wait_for_mke_containers.yml
+
+- ansible.builtin.include_tasks: tasks/helpers/mke_status.yml
+  when: "inventory_hostname in groups['managers']" 

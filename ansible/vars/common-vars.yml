@@ -1,0 +1,26 @@
+# Optional Docker daemon configuration. The variable can be either file path or the Docker Daemon json content itself
+docker_daemon_config_src: ""
+
+# Optional Docker daemon configuration file path on remote hosts
+docker_daemon_config_dst: "/etc/docker/daemon.json"
+# Source of the MKE config file. Config example ref: https://docs.mirantis.com/mke/3.7/ops/administer-cluster/configure-an-mke-cluster/use-an-mke-configuration-file.html
+mke_config_src: ""
+
+# THE MCR license value
+mcr_license: ""
+
+# The MKE license value
+mke_license: ""
+
+# MKE Installation flags
+# https://docs.mirantis.com/mke/3.7/cli-ref/mke-cli-install.html
+mke_install_flags:
+  [
+    '--san="{{ mke_url }}"',
+    '--default-node-orchestrator="kubernetes"',
+    '--nodeport-range="32768-35535"',
+    "--force-minimums",
+  ]
+
+# The appointed manager node used as a lead node
+main_manager: "{{ groups['managers'][0] }}"

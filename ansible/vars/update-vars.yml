@@ -1,0 +1,2 @@
+# Number of nodes that get updated in parallel
+update_worker_batch_size: 3

@@ -1,0 +1,3 @@
+- name: Get current MKE version
+  ansible.builtin.shell: docker inspect ucp-proxy -f {% raw %}'{{index .Config.Labels "com.docker.ucp.version"}}'{% endraw %}
+  register: current_mke_version

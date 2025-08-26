@@ -1,0 +1,102 @@
+# vSphere credentials
+######################
+# URL or IP address of vSphere 
+vsphere_server = "vcenter-67.ssl.mirantis.net"
+
+# vSphere username
+vsphere_user = "<username>"
+
+# vSphere username password
+vsphere_password = "<password>"
+
+# vSphere resources
+# Paths to most of the resources can be obtained by using govc tool (https://github.com/vmware/govmomi/blob/main/govc/README.md)
+######################
+
+datacenter = "MIRANTIS"
+resource_pool = "/MIRANTIS/host/MCC-BMteam/Resources/Hosted-ResPool"
+
+# Those two parameters are conflicting ones. You should selecter either datastore or datastore_cluster to use
+datastore = "/MIRANTIS/datastore/iscsi-storage-mcc"
+#datastore_cluster = "/MIRANTIS/datastore/some-datastore-cluster"
+
+network = "VMWare-MCC-Hosted"
+folder = "/MCC-Hosted/demo1"
+
+# Path in vSphere to VM template that will be used for manager nodes
+manager_vm_template = "/MIRANTIS/vm/MCC-Hosted/Ubuntu-20.04-k0s-tmpl"
+
+# Path in vSphere to VM template that will be used for worker nodes
+worker_vm_template = "/MIRANTIS/vm/MCC-Hosted/Ubuntu-20.04-k0s-tmpl"
+
+# SSH keys
+# Those keys will used to access the machines through SSH
+######################
+
+ssh_private_key_file = "/path/to/priv_key"
+ssh_public_key_file = "/path/to/pub_key"
+
+
+# MKEx machines configuration
+######################
+
+# Number of managers in the cluster
+quantity_managers = 2
+
+# Number of workers in the cluster
+quantity_workers = 1
+
+# Number of CPU for managers
+cpu_count_managers = 4
+
+# RAM in MBs for managers
+memory_count_managers = 4096
+
+# Number of CPU for workers
+cpu_count_workers = 4
+
+# RAM in MBs for workers
+memory_count_workers = 4096
+
+# Manager root disk size in GBs
+manager_disk_size = 40
+
+# Worker root disk size in GBs
+worker_disk_size = 60
+
+# Type of network. Possible options are "IPAM" and "DHCP".
+# If "IPAM" is set, then 'ip_range_managers', 'ip_range_workers',
+# 'network_gateway' and 'nameserver' variables need to be set as well.
+network_type = "IPAM"
+
+# Range of IP addresses that will be assigned to manager nodes
+ip_range_managers = "172.16.38.149-172.16.38.151"
+
+# Range of IP addresses that will be assigned to worker nodes
+ip_range_workers = "172.16.38.152-172.16.38.153"
+
+# Gateway IP address
+network_gateway = "172.16.38.1"
+
+# DNS IP address
+nameserver = "172.18.176.6"
+
+# Firmware to use for the VM
+# Possible options are "efi" and "bios"
+firmware = "efi"
+
+# This name will be used as a prefix for VM names
+# E.g. if cluster_name = "mkex-cluster", then names of managers will look like this:
+# "mkex-cluster-ctr1", "mke-cluster-ctr2", etc.
+# Names of workers will look like this:
+# "mkex-cluster-wrk1", "mkex-cluster-wrk2", etc.
+cluster_name = "mkex-cluster"
+
+# Name of the user that will be used to access the cluster through SSH.
+# This user will be in sudoers group
+vm_user = "rocky"
+
+# Variables for dev purposes
+
+#docker_hub_username = "user"
+#docker_hub_pass = "pass"

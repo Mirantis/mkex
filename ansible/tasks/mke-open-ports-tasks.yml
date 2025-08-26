@@ -1,0 +1,38 @@
+- name: Activate the manager self zone in firewalld
+  ansible.builtin.command: firewall-cmd --zone=trusted --add-interface=lo --permanent
+  become: true
+  when: inventory_hostname in groups['managers']
+
+- name: Activate the worker self zone in firewalld
+  ansible.builtin.command: firewall-cmd --zone=trusted --add-interface=lo --permanent
+  become: true
+  when: inventory_hostname in groups['workers']
+
+- name: Add the firewalld mke external manager service
+  ansible.builtin.command: firewall-cmd --zone=public --add-service=mke_manager_external --permanent
+  become: true
+  when: inventory_hostname in groups['managers']
+
+- name: Add the firewalld mke internal manager service
+  ansible.builtin.command: firewall-cmd --zone=public --add-service=mke_manager_internal --permanent
+  become: true
+  when: inventory_hostname in groups['managers']
+
+- name: Add the firewalld mke self manager service
+  ansible.builtin.command: firewall-cmd --zone=trusted --add-service=mke_manager_self --permanent
+  become: true
+  when: inventory_hostname in groups['managers']
+
+- name: Add the firewalld mke internal worker service
+  ansible.builtin.command: firewall-cmd --zone=public --add-service=mke_worker_internal --permanent
+  become: true
+  when: inventory_hostname in groups['workers']
+
+- name: Add the firewalld mke self worker service
+  ansible.builtin.command: firewall-cmd --zone=trusted --add-service=mke_worker_self --permanent
+  become: true
+  when: inventory_hostname in groups['workers']
+
+- name: Reload the firewalld service
+  ansible.builtin.command: firewall-cmd --reload
+  become: true

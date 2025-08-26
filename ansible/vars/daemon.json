@@ -1,0 +1,19 @@
+{
+    "log-level": "info",
+    "userns-remap": "",
+    "cgroup-parent": "",
+    "default-ulimit": {},
+    "log-opts": {
+        "max-size": "20m",
+        "max-file": "3"
+    },
+    "selinux-enabled": true,
+    "ip-forward": true,
+    "icc": false,
+    "insecure-registries": [],
+    "default-address-pools": [
+        {
+            "base": "10.0.0.0/8","size":23
+        }
+    ]
+}

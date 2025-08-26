@@ -1,0 +1,33 @@
+- name: Set start timestamp
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - ansible.builtin.set_fact:
+        start_timestamp: '{{ now(utc=true,fmt="%Y%m%d%H%M") }}'
+
+- name: Backup MKE
+  hosts: managers
+  gather_facts: false
+  vars_files:
+    - vars/common-vars.yml
+  vars:
+    backup_filename: '/tmp/mke-{{ current_mke_version.stdout }}-backup-{{ hostvars["localhost"]["start_timestamp"] }}.tar'
+  tasks:
+    - ansible.builtin.include_tasks: tasks/helpers/get_current_mke_version.yml
+    - ansible.builtin.include_tasks: tasks/helpers/mke_status.yml
+
+    - ansible.builtin.include_tasks: tasks/mke-backup-tasks.yml
+
+- name: Backup Swarm
+  hosts: managers
+  gather_facts: false
+  serial: 1
+  vars_files:
+    - vars/common-vars.yml
+  tasks:
+    - ansible.builtin.include_tasks: tasks/helpers/get_current_engine_version.yml
+    - ansible.builtin.include_tasks: tasks/helpers/swarm_status.yml
+
+    - ansible.builtin.include_tasks: tasks/swarm-backup-tasks.yml
+
+    - ansible.builtin.include_tasks: tasks/helpers/wait_for_mke_containers.yml

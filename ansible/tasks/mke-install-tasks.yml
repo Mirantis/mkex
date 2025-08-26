@@ -1,0 +1,26 @@
+- ansible.builtin.include_tasks: tasks/helpers/swarm_status.yml
+
+- name: Check if MKE is installed
+  ansible.builtin.shell: docker ps -f name=ucp- -q
+  register: mke_installed
+  run_once: true
+
+- name: Append the --license MKE flag to the list
+  ansible.builtin.set_fact:
+    mke_install_flags: "{{ mke_install_flags + ['--license=' ~ mke_license] }}"
+  when: mke_license != ""
+  run_once: true
+
+- ansible.builtin.include_tasks: tasks/helpers/get_target_mke_version.yml
+
+- name: Install MKE
+  ansible.builtin.command: >
+    docker run --rm --security-opt label=disable -v /var/run/docker.sock:/var/run/docker.sock
+    mirantis/ucp:{{ target_mke_version.stdout }} install --admin-username {{ admin_user }} --admin-password {{ admin_pass }}
+    {{ mke_install_flags | join(' ') }}
+
+  when: swarm_status.stdout == 'active' and mke_installed.stdout | length == 0
+  run_once: true
+
+- ansible.builtin.include_tasks: tasks/helpers/mke_status.yml
+- ansible.builtin.include_tasks: tasks/helpers/remove_mke_docker_config.yml

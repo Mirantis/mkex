@@ -1,0 +1,21 @@
+- name: Write Docker daemon config file to remote hosts
+  hosts: all
+  gather_facts: false
+  vars_files:
+    - common-vars.yml
+  vars:
+    docker_daemon: "{{ lookup('file', docker_daemon_config_src) if docker_daemon_config_src is file else docker_daemon_config_src }}"
+  tasks:
+    - ansible.builtin.include_tasks: tasks/mcr-copy-docker-daemon.yml
+  handlers:
+    - import_tasks: handlers/docker.yml
+
+- name: Add the MCR license to the machines
+  hosts: all
+  gather_facts: false
+  vars_files:
+    - vars/common-vars.yml
+  tasks:
+    - ansible.builtin.include_tasks: tasks/mcr-license-tasks.yml
+  handlers:
+    - import_tasks: handlers/docker.yml

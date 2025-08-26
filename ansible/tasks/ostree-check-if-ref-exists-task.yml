@@ -1,0 +1,7 @@
+- name: Check if OSTree ref exists in the remote
+  ansible.builtin.shell: ostree remote refs "{{ ostree_remote_name }}"
+  register: ostree_refs_list
+
+- ansible.builtin.fail:
+    msg: "OSTree ref {{ ostree_ref_name }} does not exists on the remote '{{ ostree_remote_name }}'"
+  when: "[ostree_remote_name, ostree_ref_name] | join(':') not in ostree_refs_list.stdout_lines"

@@ -1,0 +1,20 @@
+- name: Write MKE TOML config from the mke_config_src variable
+  delegate_to: "{{ main_manager }}"
+  ansible.builtin.copy:
+    content: "{{ mke_config_src }}"
+    dest: /etc/docker/mke-config.toml
+  when: mke_config_src is defined and mke_config_src != ""
+  run_once: true
+
+- name: Create Docker Swarm Config object for MKE TOML config
+  delegate_to: "{{ main_manager }}"
+  ansible.builtin.command:
+    cmd: docker config create com.docker.ucp.config /etc/docker/mke-config.toml
+  when: mke_config_src != ""
+  run_once: true
+
+- name: Append the --existing-config MKE flag
+  ansible.builtin.set_fact:
+    initial_list: "{{ mke_install_flags + ['--existing-config'] }}"
+  when: mke_config_src != ""
+  run_once: true
