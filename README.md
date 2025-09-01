@@ -10,6 +10,15 @@ Provisioning is the process of preparing a cluster of MKEx compute nodes within 
 
 For further details, please see [provisioning document](docs/provisioning.md).
 
+### Assets
+
+Mirantis provides assets for provisioning MKEx on different providers. Assets consist of bootable images that can be used to provision virtual machine or baremetale machine.
+
+| Type  | Download link | Description | Mirantis product's version |
+| :---- | ------------- | ----------- | -------------------------- |
+| ISO   | [Link](https://get.mirantis.com/mkex/images/mkex-bootc-r9-bare-mcr25.0-mke3.8-simple.iso)      | **Simple** ISO with basic kickstart embedded. Unattended Anaconda installation will be performed. See [this document](docs/iso-editions.md#simple) to get more details about Simple image edition. | MCR 25.0.12 / MKE 3.8.7 |
+| ISO   | [Link](https://get.mirantis.com/mkex/images/mkex-bootc-r9-bare-mcr25.0-mke3.8-generic.iso)      | **Generic** ISO without any customisation. See [this document](docs/iso-editions.md#generic-image-customisation.md) to get the details on how to properly customise it | MCR 25.0.12 / MKE 3.8.7 |
+| QCOW2 | [Link](https://get.mirantis.com/mkex/images/mkex-bootc-r9-cloud-mcr25.0-mke3.8.qcow2)      | Standard QEMU/KVM bootable image | MCR 25.0.12 / MKE 3.8.7 |
 ## Installation
 
 Installation in this document refers to the process of deploying Mirantis Kubernetes Engine on top of already provisioned machines (VMs or baremetal). 
