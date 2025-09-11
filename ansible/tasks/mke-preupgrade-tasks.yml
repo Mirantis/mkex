@@ -12,5 +12,5 @@
       - "mirantis/ucp:{{ target_mke_version.stdout }}"
       - upgrade
       - checks
-      - "{{ mke_upgrade_flags | join(' ') }}"
+      - "{{ mke_upgrade_check_flags | join(' ') }}"
   run_once: true

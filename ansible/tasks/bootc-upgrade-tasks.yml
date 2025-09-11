@@ -1,0 +1,35 @@
+- name: Get current bootc image
+  ansible.builtin.command: bootc status --format json
+  become: true
+  register: bootc_status
+  changed_when: false
+
+- name: Parse current bootc image
+  ansible.builtin.set_fact:
+    current_image: "{{ (bootc_status.stdout | from_json).spec.image.image }}"
+
+- name: Run bootc switch to a target image
+  ansible.builtin.command: bootc switch {{ bootc_image_ref }}
+  become: true
+  when:
+    - bootc_image_ref is defined
+    - bootc_image_ref | length > 0
+    - current_image != bootc_image_ref
+  register: bootc_switch
+
+- name: Run bootc upgrade (latest from the same image tag)
+  ansible.builtin.command: bootc upgrade
+  become: true
+  when: (bootc_image_ref | default('')) == '' or current_image == bootc_image_ref
+  register: bootc_upgrade
+
+- name: Reboot machine if bootc upgrade changed anything
+  ansible.builtin.reboot:
+    reboot_command: systemctl reboot
+  become: true
+  when: bootc_upgrade.changed or bootc_switch.changed
+
+- ansible.builtin.include_tasks: tasks/helpers/wait_for_mke_containers.yml
+
+- ansible.builtin.include_tasks: tasks/helpers/mke_status.yml
+  when: "inventory_hostname in groups['managers']"
