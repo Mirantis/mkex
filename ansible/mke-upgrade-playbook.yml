@@ -1,12 +1,3 @@
-- name: Check if OSTree ref exists
-  hosts: all
-  gather_facts: false
-  vars_files:
-    - upgrade-vars.yml
-  tasks:
-    - ansible.builtin.include_tasks: tasks/ostree-check-if-ref-exists-task.yml
-      when: "ostree_ref_name != ''"
-
 - name: Setup up Docker on remote hosts
   ansible.builtin.import_playbook: mcr-setup-docker.yml
 
@@ -18,16 +9,16 @@
 
 - name: Backup MKE before upgrade
   ansible.builtin.import_playbook: mke-backup-playbook.yml
-- name: Upgrade OS with OSTree for managers
+- name: Upgrade OS with bootc for managers
   hosts: managers
   vars_files:
     - upgrade-vars.yml
   serial: 1
   gather_facts: false
   tasks:
-    - ansible.builtin.include_tasks: tasks/ostree-upgrade-tasks.yml
+    - ansible.builtin.include_tasks: tasks/bootc-upgrade-tasks.yml
 
-- name: Upgrade OS with OSTree for workers
+- name: Upgrade OS with bootc for workers
   hosts: workers
   vars_files:
     - common-vars.yml
@@ -40,7 +31,7 @@
         file: tasks/swarm-drain-nodes.yml
     - name: OSTree upgrade
       ansible.builtin.include_tasks:
-        file: tasks/ostree-upgrade-tasks.yml
+        file: tasks/bootc-upgrade-tasks.yml
     - name: Docker Swarm Uncordon 'workers'
       ansible.builtin.include_tasks:
         file: tasks/swarm-uncordon-nodes.yml
@@ -54,7 +45,7 @@
     - ansible.builtin.include_tasks: tasks/helpers/get_current_mke_version.yml
     - ansible.builtin.include_tasks: tasks/helpers/get_target_mke_version.yml
     - ansible.builtin.include_tasks: tasks/mke-preupgrade-tasks.yml
-      when: "ostree_ref_name != ''"
+      when: "bootc_image_ref != ''"
 
 - name: Upgrade MKE
   hosts: managers
@@ -66,4 +57,4 @@
     - ansible.builtin.include_tasks: tasks/helpers/get_target_mke_version.yml
     - name: Run upgrade MKE tasks
       ansible.builtin.include_tasks: tasks/mke-upgrade-tasks.yml
-      when: target_mke_version.stdout > current_mke_version.stdout or ostree_ref_name != ''
+      when: target_mke_version.stdout > current_mke_version.stdout or bootc_image_ref != ''

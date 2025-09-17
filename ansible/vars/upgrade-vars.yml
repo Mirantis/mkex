@@ -1,21 +1,16 @@
-# MKE Upgrade flags
+# MKE Upgrade flag
 # Use this flag to force the minimum system requirements for MKE installation whenever your machine is
 # below the minimum requirements, less than 8GB RAM and 40GB hard disk. This flag is useful for testing mainly.
 # More on the subject read here: https://docs.mirantis.com/mke/3.7/install/system-requirements.html
-mke_upgrade_flags: ["--force-minimums"]
-# if not empty, then the url can be used to replace any machine ostree repo remotes
-# ostree_repo_url: "https://get.mirantis.com/mkex-ostree/build/ostree/repo/"
+mke_upgrade_flags: [--force-minimums]
+
+# MKE upgrade check flags. Use this variable for injecting the required flags for the upgrade check subcommand used for mke pre-upgrade ansible task.
+# Available flags can be found at https://docs.mirantis.com/mke/3.8/cli-ref/mke-cli-upgrade.html#checks-subcommand 
+mke_upgrade_check_flags: ["--force-minimums"]
 
 # Number of nodes that get upgraded in parallel
 upgrade_worker_batch_size: 3
 
-
-# URL of the remote OSTree repository
-ostree_repo_url: "https://get.mirantis.com/mkex/ostree"
-
-# Name of the remote OSTree repository
-ostree_remote_name: "mkex"
-
-# Name of the OSTree branch
-# If empty, then current OSTree branch will be used (the one that is currently configured on machines)
-ostree_ref_name: ''
+# OCI image reference to be upgraded. Eg. registry.mirantis.com/mkex/r9-cloud:mcr25.0-mke3.8
+# For more details on how to use this variable, refer to the upgrade runbook at https://github.com/Mirantis/mkex/blob/master/docs/runbooks/upgrade-mkex.md.
+bootc_image_ref: ''
