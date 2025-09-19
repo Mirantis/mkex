@@ -29,6 +29,10 @@ Prerequisites for the installation can be found in the [Provisioning](#provision
 
 To perform the installation, please see [installation runbook](docs/runbooks/install-mkex.md).
 
+## Upgrade
+
+To perform an upgrade , please see [upgrade runbook](docs/runbooks/upgrade-mkex.md).
+
 ## Troubleshooting
 
 If you encounter issues, file an issue, or talk to us on the #prod-eng or #mkex-internal channel on the Mirantis Slack server.
