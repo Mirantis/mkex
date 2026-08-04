@@ -4,17 +4,17 @@ If none of the `bootc-mke3` provisioning tooling meets the needs of an `bootc-mk
 
 Because manual provisioning is so diverse, this runbook won't be able to focus on technical directives, and will have to focus on more abstract concepts.
 
-## Pre-Requisites
+## Requirements
 
 1. A machine installation source. Mirantis offers an installation ISO image for this purpose.
 
-## Process
+## Procedure
 
 1. Provision a network for your `bootc-mke3` cluster
-   a. that allows communication based on the [MKE networking requirements](https://docs.mirantis.com/mke/3.7/install/predeployment/configure-networking.html)
+   a. that allows communication based on the [MKE networking requirements](https://docs.mirantis.com/mke/3.9/install/predeployment/configure-networking.html)
    
 2. Provision a number of `bootc-mke3` machines, using the `bootc-mke3` image source
-   a. Machine resource specifications that meet the [MKE minimum resource requirements](https://docs.mirantis.com/mke/3.7/common/mke-hw-reqs.html)
+   a. Machine resource specifications that meet the [MKE minimum resource requirements](https://docs.mirantis.com/mke/3.9/common/mke-hw-reqs.html)
    b. Machines must use static IP requirements
    c. Machines must be configured to allow access for the ansible installation tooling, typically an ssh user with sudo access
 
