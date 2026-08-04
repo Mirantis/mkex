@@ -10,7 +10,6 @@ For a use cases where cluster machines has access to the internet, official Mira
 
 For production-grade air-gapped clusters, users should have their own registry that can be accessed by the cluster machines. This registry should contain `bootc-mke3` OCI images with desired version of products. The way of obtaining the image can vary, but the most common way is to set up a mirroring from official Mirantis registry (registry.mirantis.com).
 
-
 ## Private registry usage
 
 If you're planning to use private OCI registry to store `bootc-mke3` artifacts (OCI images) and use them for your cluster, you will need to provide registry credentials in order to authenticate. To do so, you will need to add credentials file into the each machine, because for most of the operations (like upgrade) there will be a need to pull OCI image from the registry.
