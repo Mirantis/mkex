@@ -19,7 +19,7 @@ Cluster should consist of one or more compute machine nodes. In order to use `bo
 1. All machines must use the `bootc-mke3` source base (image). For available images see [Assets section](../README.md#assets)
 
 > [!NOTE]
-> **Simple** ISO edition is used mostly for demo/test purposes. For production-grade clusters consider using **Generic** ISO. QCOW2 is considered production-grade by default, although it is user's responsibility to customise it in a proper and secure way.
+> For Simple vs Generic ISO edition guidance, see [ISO editions](iso-editions.md). QCOW2 is considered production-grade by default, although it is user's responsibility to customise it in a proper and secure way.
 
 2. All machines meet MKE hardware requirements. For the list of requirements, please see Mirantis Kubernetes Engine official documentation pages, [hardware requirements section](https://docs.mirantis.com/mke/3.8/common/mke-hw-reqs.html)
 

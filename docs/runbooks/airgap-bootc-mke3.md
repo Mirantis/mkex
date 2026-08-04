@@ -35,9 +35,9 @@ rather than the network.
 
 ## Ansible variables to set
 
-### `vars/reg-creds` (copy from `vars/reg-creds.example`, gitignored)
+### `vars/reg-creds`
 
-One line per registry, `registry username password`. The playbook for setting registry credentials ([`reg-creds-playbook.yml`](../../ansible/reg-creds-playbook.yml)) uses this to:
+Set the file up per [the Ansible playbook setup in the provisioning doc](../provisioning.md#ansible-playbook-setup). The playbook for setting registry credentials ([`reg-creds-playbook.yml`](../../ansible/reg-creds-playbook.yml)) uses this to:
 
 1. `docker login` each registry on every target host.
 2. Write `/etc/ostree/auth.json` on every target host — needed for
