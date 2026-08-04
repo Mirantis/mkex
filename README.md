@@ -33,6 +33,8 @@ Prerequisites for the installation can be found in the [Provisioning](#provision
 
 To perform the installation, please see [installation runbook](docs/runbooks/install-bootc-mke3.md).
 
+Installing in an environment without internet access is covered by the [air-gapped runbook](docs/runbooks/airgap-bootc-mke3.md).
+
 ### Post-install controllers
 
 A default install also deploys the System Upgrade Controller, `cluster-upgrade-controller`, and `machine-config-controller` to the cluster, and hardens SSH/sudo access on every host. See the [controllers runbook](docs/runbooks/install-controllers.md) for what gets deployed and how to verify it, and the [machine configuration runbook](docs/runbooks/machine-config-operations.md) for applying DNS/NTP/kernel/reboot changes cluster-wide via `machine-config-controller`.
@@ -52,6 +54,18 @@ Command-line access (`kubectl` and `docker`/Swarm) goes through the MKE client b
 ## Security
 
 `bootc-mke3` integrates two Kubernetes controllers, `cluster-upgrade-controller` and `machine-config-controller`, to automate cluster and node lifecycle operations. Both delegate privileged, host-mutating operations to per-node jobs — see the [controller security analysis](docs/controller-security-analysis.md) for the full trust model and risk register, and the [hardening runbook](docs/runbooks/harden-mke3-kubernetes.md) for the concrete steps to configure a secure baseline.
+
+## Documentation map
+
+| Lifecycle stage | Docs |
+| --------------- | ---- |
+| Provision | [provisioning](docs/provisioning.md) · [Terraform on vSphere](docs/runbooks/provision-terraform-vsphere.md) · [Terraform on AWS](docs/runbooks/provision-terraform-aws.md) · [manual provisioning](docs/runbooks/provision-manually.md) · [ISO editions](docs/iso-editions.md) |
+| Install | [install bootc-mke3](docs/runbooks/install-bootc-mke3.md) · [post-install controllers](docs/runbooks/install-controllers.md) · [ansible inventory input](docs/ansible-inventory-input.md) |
+| Access | [access the cluster](docs/runbooks/access-cluster.md) |
+| Operate | [join machines (no-touch)](docs/runbooks/join-machines-no-touch.md) · [no-touch join concepts](docs/no-touch-join.md) · [machine configuration](docs/runbooks/machine-config-operations.md) |
+| Upgrade | [via ClusterUpgrade CR (canonical)](docs/runbooks/upgrade-with-controller.md) · [via Ansible (exception path)](docs/runbooks/upgrade-with-ansible.md) |
+| Secure | [controller security analysis](docs/controller-security-analysis.md) · [harden MKE3/Kubernetes](docs/runbooks/harden-mke3-kubernetes.md) |
+| Special environments | [air-gapped install/upgrade](docs/runbooks/airgap-bootc-mke3.md) · [mixed clusters / classic-to-bootc migration](docs/runbooks/mixed-cluster.md) |
 
 ## Troubleshooting
 
