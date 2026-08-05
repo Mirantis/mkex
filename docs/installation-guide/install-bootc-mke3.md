@@ -16,7 +16,7 @@ By default, admin user credentials for MKE UI are `admin/password`. If you want 
 1. Ensure expected ansible inventory exists. See [inventory description document](ansible-inventory-input.md) for more details.
 2. To override any default values, specify the desired values in the `vars/common-vars.yml` and `vars/mke-creds.yml` files
 3. Optionally: You can set the MCR and MKE licenses via the `mcr_license` and `mke_license` variables respectively.
-4. Run ansible: `ansible-playbook -i <path-to-your-inventory> ansible/mke-install-playbook.yml`
+4. Run ansible from the `ansible/` directory: `cd ansible && ansible-playbook -i <path-to-your-inventory> mke-install-playbook.yml`. Ansible only auto-loads `ansible.cfg` (which sets `host_key_checking = false`, among other defaults) from the current working directory, so running the playbook from the checkout root instead silently skips it and the first SSH connection to a fresh host fails with a non-interactive host key verification error. Use an absolute path for `<path-to-your-inventory>` (or one relative to `ansible/`) since the working directory has changed.
 
 ## Expected Results
 
