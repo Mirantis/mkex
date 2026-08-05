@@ -11,7 +11,7 @@ This guide walks a system engineer through configuring a `bootc-mke3` cluster fo
 
 ## Procedure
 
-### 1. Host hardening at install time
+### 1. Host hardening after install
 
 These controls exist in the Ansible tooling already; confirm they are enabled for production clusters in `ansible/vars/common-vars.yml`:
 
