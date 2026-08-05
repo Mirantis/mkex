@@ -1,0 +1,105 @@
+# Kube-native, no-SSH alternative for the manual MKE backup required by the
+# Prerequisites section of docs/operations-guide/upgrade-with-controller.md.
+#
+# WHY THIS EXISTS
+# A default bootc-mke3 install revokes SSH/sudo on every manager as its last
+# install step (`disable_sshd_after_install` / `revoke_sudo_after_install`,
+# both `true` by default in ansible/vars/common-vars.yml). The documented
+# backup procedure is SSH + `docker run`, which an operator who kept those
+# hardened defaults has no way to run directly. This Job runs the identical
+# backup command from inside the cluster instead, over `kubectl` only.
+#
+# It follows the same privileged / hostPID / host-root-bind-mount pattern
+# `cluster-upgrade-controller` and `machine-config-controller` already use
+# for their own node-mutating Jobs -- see the architecture diagram in
+# docs/operations-guide/controller-security-analysis.md, section 1: a
+# privileged pod with hostPID/hostNetwork and a read-write bind mount of the
+# host root at /host, then `chroot /host ...` to act in the node's own root
+# namespace, on the node's own Docker socket.
+#
+# It reuses the `system-upgrade` ServiceAccount in the `system-upgrade`
+# namespace because that SA is already granted `privileged`, `hostPID`,
+# `hostNetwork`, and `hostBindMounts` in MKE's UCPAuthorization allowlist by
+# ansible/tasks/suc-priv-grant-tasks.yml during install (`suc_service_account:
+# "system-upgrade:system-upgrade"` in ansible/vars/common-vars.yml) -- no
+# additional MKE grant is required to run this Job as-is.
+#
+# ONE JOB PER MANAGER
+# The documented procedure backs up "on each manager" -- the `ucp backup`
+# container only talks to the *local* Docker socket, so one manager's backup
+# does not cover the others. Copy this file once per manager, set
+# `metadata.name` and `spec.template.spec.nodeName` to that manager's
+# `kubectl get nodes` NAME, and apply/delete each copy separately. Do not
+# try to target multiple managers from a single Job.
+#
+# USAGE
+#   1. Fill in every <placeholder> below.
+#   2. kubectl apply -f mke-manual-backup-job.yaml
+#   3. kubectl wait -n system-upgrade --for=condition=complete \
+#        job/mke-manual-backup-<manager-node-name> --timeout=300s
+#   4. kubectl logs -n system-upgrade job/mke-manual-backup-<manager-node-name>
+#   5. kubectl delete -f mke-manual-backup-job.yaml   # Jobs don't self-clean
+#
+# IDEMPOTENT: re-running (even after a failed attempt) just produces another
+# backup tar under BACKUP_DIR -- it never mutates cluster or MKE state, so
+# there is no cleanup penalty for re-applying.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # Include the node name so multiple per-manager copies never collide.
+  name: mke-manual-backup-<manager-node-name>
+  namespace: system-upgrade
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      name: mke-manual-backup
+    spec:
+      serviceAccountName: system-upgrade
+      restartPolicy: Never
+      hostPID: true
+      hostNetwork: true
+      # Pins this Job to one specific manager -- required, see "ONE JOB PER
+      # MANAGER" above. Value is the NAME column from `kubectl get nodes`.
+      nodeName: <manager-node-name>
+      tolerations:
+        - operator: Exists   # run regardless of manager taints
+      containers:
+        - name: mke-backup
+          image: alpine:3.20   # only needs `chroot`+`sh`; same base as the
+                                # machine-config-controller agent image
+          securityContext:
+            privileged: true
+          env:
+            - name: MKE_VERSION
+              # Must match the currently-running MKE version, e.g. "3.9.4".
+              # Same value used for `mirantis/ucp:<current-version>` in the
+              # SSH-based procedure.
+              value: "<mke-version>"
+            - name: BACKUP_DIR
+              # Host path. Use the same directory you intend to pass as
+              # spec.product.mke3.backupDir on the ClusterUpgrade CR.
+              value: "<backup-dir-on-host>"
+            - name: BACKUP_FILE
+              value: "<backup-file-name>.tar"
+          command:
+            - chroot
+            - /host
+            - sh
+            - -c
+            - |
+              set -eu
+              mkdir -p "$BACKUP_DIR"
+              chmod o+w "$BACKUP_DIR"
+              docker run --rm --log-driver none \
+                -v /var/run/docker.sock:/var/run/docker.sock \
+                -v "$BACKUP_DIR:/backup" \
+                "mirantis/ucp:$MKE_VERSION" backup --no-passphrase --file "$BACKUP_FILE"
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+      volumes:
+        - name: host-root
+          hostPath:
+            path: /
+            type: Directory

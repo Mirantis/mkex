@@ -43,6 +43,25 @@ No SSH and no Ansible inventory are required — only `kubectl` access via the
    The container writes as a non-root uid, hence the `chmod o+w` on the host
    backup directory. This is required regardless of which upgrade mechanism
    you use.
+
+   > [!NOTE]
+   > **No-SSH alternative**: the SSH-based method above is the simplest
+   > option when SSH is available, but a default `bootc-mke3` install
+   > revokes SSH/sudo on every manager as its last install step
+   > (`disable_sshd_after_install` / `revoke_sudo_after_install`, both
+   > `true` by default in `ansible/vars/common-vars.yml`) — leaving no way
+   > to run the command above without first re-enabling access you were
+   > told to disable. For that hardened/no-SSH case, use
+   > [`docs/examples/mke-manual-backup-job.yaml.example`](../examples/mke-manual-backup-job.yaml.example)
+   > instead: a `kubectl`-only Job that runs the identical
+   > `docker run ... mirantis/ucp ... backup` command from inside the
+   > cluster, using the same privileged/hostPID/host-root-bind-mount
+   > pattern `cluster-upgrade-controller` and `machine-config-controller`
+   > already use for their own node-mutating operations (see
+   > [controller-security-analysis.md](controller-security-analysis.md)
+   > §1). It requires one applied copy per manager — see the manifest's
+   > own comments for exact usage. This is an alternative to the SSH
+   > method, not a replacement for it: keep using SSH when it's available.
 2. `cluster-upgrade-controller` installed in the cluster — installed by
    default as part of a standard [install](../installation-guide/install-bootc-mke3.md).
 3. A [client bundle](access-cluster.md) with `kubectl` configured against the
