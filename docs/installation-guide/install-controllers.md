@@ -148,7 +148,8 @@ fails.
 | `kubectl apply` on a `MachineConfigChange` (or `ClusterUpgrade`) fails `strict decoding error: unknown field ...` | The CRD is stale relative to the chart actually installed | `kubectl apply -f <chart>/crds/*.yaml` for the controller that owns the CRD |
 | A controller's pod image doesn't match `versions.txt` | Its chart is still on a registry default (`machine-config-controller`, most commonly), or an override didn't take | Re-run the chart-override procedure above; re-verify |
 | `machine-config-controller` deployment not found in namespace `mke` | Its chart hardcodes `targetNamespace: system-upgrade`; look there instead | Not a fault — expected behavior |
-| Locked out of SSH and sudo on every node | `disable_sshd_after_install`/`revoke_sudo_after_install` ran at the end of install (see [install runbook](install-bootc-mke3.md#post-install-automation)) | Break-glass recovery below |
+| Locked out of SSH and sudo on every node | `disable_sshd_after_install`/`revoke_sudo_after_install` ran during install, before the controller installs (see [install runbook](install-bootc-mke3.md#post-install-automation)) | Break-glass recovery below |
+| `machine-config-controller` pod stuck in `CrashLoopBackOff`, logs show `plans.upgrade.cattle.io is forbidden` and `Could not wait for Cache to sync` | Its pinned chart (`registry.mirantis.com/machine-config-controller/charts/machine-config-controller:0.1.4`, the `machine_config_controller_version` default in `vars/common-vars.yml`) ships a `ClusterRole` with no rule for `upgrade.cattle.io`/`plans`, so its `Plan`-watching informer never syncs and the manager exits every ~2 minutes | Known chart defect, not an installer misconfiguration — no workaround via Ansible vars. Track upstream fix in `machine-config-controller`'s chart RBAC template |
 
 ### Break-glass recovery: locked out of SSH and sudo
 

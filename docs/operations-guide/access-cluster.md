@@ -48,6 +48,19 @@ mkdir -p mke-bundle && unzip -q bundle.zip -d mke-bundle && cd mke-bundle
 > Use `-k`/`--insecure` only while MKE still serves its self-signed
 > certificate; drop it once MKE has a trusted certificate installed.
 
+### Option 3 — Fetch the bundle with the provided Ansible playbook
+
+If you still have the Ansible inventory used to install the cluster, this
+automates option 2 above (retries, correct headers, cleanup) and is the same
+path other playbooks in this repo use internally
+(`cluster-upgrade-controller`/`machine-config-controller` install tasks):
+
+```sh
+cd ansible
+ansible-playbook -i <path-to-your-inventory> mke-client-bundle-playbook.yml
+# bundle extracted to ansible/mke-bundle/ by default; override with -e bundle_dest=<path>
+```
+
 ### Use kubectl (Kubernetes API)
 
 The bundle contains a complete kubeconfig (`kube.yml`):

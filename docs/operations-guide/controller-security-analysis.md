@@ -97,7 +97,7 @@ Existing mitigations the controller applies: image/path values are shell-quoted 
 
 ### 3.1 RBAC footprint
 
-Source: kubebuilder markers in `internal/controller/machineconfigchange_controller.go:64-69`, rendered to `charts/machine-config-controller/templates/{clusterrole,role,leader-election-role}.yaml`.
+Source: kubebuilder markers in `internal/controller/machineconfigchange_controller.go:64-69` at the analyzed commit `6b2b670`, rendered to `charts/machine-config-controller/templates/{clusterrole,role,leader-election-role}.yaml`.
 
 | Scope | API group | Resource | Verbs |
 |---|---|---|---|
@@ -109,6 +109,21 @@ Source: kubebuilder markers in `internal/controller/machineconfigchange_controll
 | Namespaced | `coordination.k8s.io` | `leases` | full CRUD (leader election) |
 
 Same escalation shape as `cluster-upgrade-controller`: the controller itself cannot touch a node, but its `plans` grant lets it cause SUC to schedule a privileged Job per matching node. The `secrets` grant (including `delete`) is scoped to the target namespace only — reasonably tight — but that namespace is the same one SUC uses to run privileged Jobs, so namespace-level access control matters (see §5).
+
+> [!WARNING]
+> **This table does not match what actually ships.** The chart version
+> pinned by default in this repo's install automation
+> (`machine_config_controller_version: "0.1.4"` in
+> `ansible/vars/common-vars.yml`) has **no `plans.upgrade.cattle.io` rule at
+> all** in its `ClusterRole` — confirmed live: the controller pod
+> `CrashLoopBackOff`s, logging `plans.upgrade.cattle.io is forbidden` and
+> `Could not wait for Cache to sync` roughly every 2 minutes, indefinitely.
+> The analysis above was done against upstream commit `6b2b670`; whatever
+> chart that commit produced either predates or postdates the RBAC gap in
+> `0.1.4` — the two were not confirmed to be the same artifact. Do not treat
+> §3.1 as an accurate description of the default install's RBAC footprint
+> until re-verified against the actual pinned chart version. See the
+> [controllers runbook](../installation-guide/install-controllers.md) troubleshooting table for the live symptom.
 
 ### 3.2 Pod/container hardening (already in place)
 

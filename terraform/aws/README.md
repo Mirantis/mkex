@@ -36,8 +36,8 @@ This folder is intentionally thin — `main.tf` calls the upstream `mke3` exampl
 | `aws.region` | AWS region | `us-east-1` |
 | `network` | VPC CIDR and gateway flags | `172.31.0.0/16`, no NAT/VPN |
 | `subnets` | Subnet CIDR blocks mapped to node groups | `{}` |
-| `nodegroups` | EC2 node group definitions (`ami_id`/`ami_owner` for bootc, type, count, role) | — |
-| `is_bootc_based` | Inject the `cloud-user` cloud-init payload | `true` |
+| `nodegroups` | EC2 node group definitions (`ami_id`/`ami_owner` for bootc, type, count, role). Each entry also accepts a `user_data` field, but it is silently ignored whenever `is_bootc_based = true` — see below | — |
+| `is_bootc_based` | Inject the `cloud-user` cloud-init payload, overriding any per-nodegroup `user_data` | `true` |
 | `ssh_pk_location` | Directory to write the generated SSH private key | `./ssh-keys/` |
 | `extra_tags` | Additional AWS tags applied to all resources | `{}` |
 

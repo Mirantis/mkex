@@ -20,6 +20,7 @@ Users of MCR/MKE3 who are interested in moving from their existing stack to a st
    a. The cluster should be healthy according to MKE3 (at least the control plane must be healthy)
 2. Docker cli access the cluster (typically using the MKE3 client bundle, to access the swarm docker socket — see the [cluster access runbook](access-cluster.md))
 3. [Optional] kubectl access to the existing cluster (typically using the MKE3 client bundle, to access the kube API — see the [cluster access runbook](access-cluster.md))
+4. Read access to the registry hosting the `bootc-mke3` OCI images for the new machines — see [registry requirements](../installation-guide/provisioning.md#registry)
 
 ### Procedure
 

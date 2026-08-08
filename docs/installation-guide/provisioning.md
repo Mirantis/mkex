@@ -52,10 +52,14 @@ Cluster should consist of one or more compute machine nodes. In order to use `bo
 > Machine customization at provision time is done via **kickstart** for
 > ISO-provisioned machines — the standard production mechanism (see
 > [ISO editions](iso-editions.md#generic-image-customisation)). cloud-init
-> is only available on the cloud-platform builds (AMI/QCOW2) and is
-> primarily used for internal testing. Where this documentation offers both
-> mechanisms, prefer kickstart unless you are specifically working with a
-> cloud build.
+> is available on the cloud-platform builds (AMI/QCOW2) and is primarily
+> used for internal testing — **and also on the vSphere path**, despite
+> vSphere being ISO-provisioned: the [vSphere Terraform
+> module](provision-terraform-vsphere.md) configures its deployed VMs via
+> cloud-init through vSphere's `guestinfo.userdata`/`guestinfo.metadata`
+> (see `terraform/vsphere/helpers/cloudinit/`), not kickstart. Where this
+> documentation offers both mechanisms, prefer kickstart unless you are
+> specifically working with a cloud build or the vSphere Terraform path.
 
 2. All machines meet MKE hardware requirements. For the list of requirements, please see Mirantis Kubernetes Engine official documentation pages, [hardware requirements section](https://docs.mirantis.com/mke/3.9/common/mke-hw-reqs.html)
 
