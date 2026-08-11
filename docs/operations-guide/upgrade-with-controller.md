@@ -13,7 +13,7 @@ No SSH and no Ansible inventory are required — only `kubectl` access via the
 > identical underlying `mirantis/ucp upgrade` checks and commands.
 
 > [!WARNING]
-> **Known issue, tracked upstream ([Mirantis/bootc-mirantis#178](https://github.com/Mirantis/bootc-mirantis/issues/178))**: the embedded `mirantis/ucp upgrade
+> **Known issue, tracked separately**: the embedded `mirantis/ucp upgrade
 > checks` step (`mke3-verify-environment`) can hard-fail with
 > `FAIL: storage driver is 'overlayfs', expected 'overlay2'` against
 > `bootc-mke3`'s MCR builds. None of the documented bypass flags

@@ -140,7 +140,6 @@ fails.
 | A controller's pod image doesn't match `versions.txt` | The chart var was overridden to an `oci://` registry reference and that registry's chart lags the image build | Remove the override (or point `*_version` at the desired tag) and re-run; re-verify |
 | `machine-config-controller` deployment not found in namespace `mke` | Its chart hardcodes `targetNamespace: system-upgrade`; look there instead | Not a fault — expected behavior |
 | Locked out of SSH and sudo on every node | `disable_sshd_after_install`/`revoke_sudo_after_install` ran during install, before the controller installs (see [install runbook](install-bootc-mke3.md#post-install-automation)) | Break-glass recovery below |
-| `machine-config-controller` pod stuck in `CrashLoopBackOff`, logs show `plans.upgrade.cattle.io is forbidden` and `Could not wait for Cache to sync` | Its pinned chart (`registry.mirantis.com/machine-config-controller/charts/machine-config-controller:0.1.4`, the `machine_config_controller_version` default in `vars/common-vars.yml`) ships a `ClusterRole` with no rule for `upgrade.cattle.io`/`plans`, so its `Plan`-watching informer never syncs and the manager exits every ~2 minutes | Known chart defect, not an installer misconfiguration — no workaround via Ansible vars. Track upstream fix in `machine-config-controller`'s chart RBAC template |
 
 ### Break-glass recovery: locked out of SSH and sudo
 

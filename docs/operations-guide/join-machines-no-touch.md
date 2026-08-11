@@ -69,9 +69,10 @@ SWARM_MANAGER=10.0.0.10:2377
 **Kickstart is the primary path**: production `bootc-mke3` machines are
 provisioned from the ISO (bare metal), where kickstart is the standard
 customization mechanism. Cloud-init applies **only to the cloud-platform
-builds** (AMI/QCOW2) — it does not exist on bare-metal ISO installs — and
-those builds are primarily used for internal testing. systemd credentials
-work on either, where the infrastructure can deliver them.
+builds** (AMI/QCOW2) — it does not exist on bare-metal ISO installs. AMI
+builds are primarily used for internal testing; QCOW2 is publicly
+announced/downloadable. systemd credentials work on either, where the
+infrastructure can deliver them.
 
 Two node-local gaps must be handled in the same provisioning payload,
 whichever delivery path you use:
@@ -152,9 +153,9 @@ confirmed join.
 
 #### Cloud (cloud-init user-data — cloud builds only; tmpfs delivery)
 
-Applies only to the cloud-platform builds (AMI/QCOW2), primarily used for
-internal testing. The credential file itself is written to tmpfs and never
-touches disk. Note that cloud-init independently caches the raw user-data
+Applies only to the cloud-platform builds (AMI/QCOW2) — AMI primarily used
+for internal testing, QCOW2 publicly announced/downloadable. The credential
+file itself is written to tmpfs and never touches disk. Note that cloud-init independently caches the raw user-data
 under `/var/lib/cloud`; that cache is scrubbed automatically after a
 successful join.
 

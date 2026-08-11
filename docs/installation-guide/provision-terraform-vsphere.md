@@ -98,12 +98,13 @@ Few things that need to be mentioned:
 2. IP addresses of managers, workers and gateway should be configured according to vSphere network configuration. DNS should be reachable by VMs.
 3. `cluster_name` variable will be used as a prefix for VM names. E.g. if cluster_name = "bootc-mke3-cluster", then names of managers will look like this: `bootc-mke3-cluster-mngr1`, `bootc-mke3-cluster-mngr2`, etc. Names of workers will look like this: `bootc-mke3-cluster-wrk1`, `bootc-mke3-cluster-wrk2`, etc.
 4. `vm_user` (required, no default) — the username the deployed VMs are
-   configured with via cloud-init (see the note in
-   [provisioning.md](provisioning.md#machines) — unlike bare-metal/AMI
-   builds, this vSphere path configures VMs through cloud-init, not
-   kickstart, using the template files under
-   `terraform/vsphere/helpers/cloudinit/`). Must match whatever user your
-   template's cloud-init datasource is configured to create/authorize.
+   configured with. Current vSphere testing practice provisions the VM
+   template using the **bare** ISO variant and kickstart (see [Option
+   1](#option-1---manual) above), not cloud-init — a vSphere-specific
+   cloud-init platform build existed previously but is not what's used
+   today (see the note in [provisioning.md](provisioning.md#machines)).
+   Must match whatever user your template is actually configured to
+   create/authorize, however that template was built.
 5. `firmware` (required, no default) — `bios` or `efi`, matching how the VM
    template itself was created.
 
