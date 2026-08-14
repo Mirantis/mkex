@@ -3,9 +3,16 @@
 # Steps:
 #   1. Fetch and extract the client bundle (kube.yml is the kubeconfig).
 #   2. Deploy System Upgrade Controller (SUC) when deploy_suc is true.
-#   3. Patch SUC deployment with node affinity so it schedules only on
+#   3. Patch SUC ConfigMap to extend the job active deadline to 3600 s. Runs
+#      before step 4 deliberately: SUC reads this ConfigMap via envFrom at
+#      pod start and never re-reads it, so patching the ConfigMap alone does
+#      not take effect on the running controller. Step 4's affinity patch
+#      mutates spec.template and is what forces the controller's one
+#      unavoidable rollout on a fresh install; ordering the ConfigMap patch
+#      first means that rollout picks up 3600 s instead of the upstream
+#      manifest's baked default of 900 s (PRODENG-3660).
+#   4. Patch SUC deployment with node affinity so it schedules only on
 #      control-plane / master nodes running Linux.
-#   4. Patch SUC ConfigMap to extend the job active deadline to 3600 s.
 #   5. Grant system-upgrade-controller service account the privileged attribute
 #      in MKE cluster config when deploy_suc is true (UCPAuthorization allowlist).
 #   6. Install cluster-upgrade-controller via Helm chart when deploy_cluster_upgrade_controller
@@ -44,6 +51,27 @@
   run_once: true
   changed_when: "'configured' in _suc_apply.stdout or 'created' in _suc_apply.stdout"
   register: _suc_apply
+
+- name: Patch SUC ConfigMap to extend job active deadline
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - patch
+      - configmap
+      - default-controller-env
+      - -n
+      - system-upgrade
+      - --kubeconfig
+      - "{{ bundle_dest }}/kube.yml"
+      - --type
+      - merge
+      - --patch
+      - '{"data":{"SYSTEM_UPGRADE_JOB_ACTIVE_DEADLINE_SECONDS":"3600"}}'
+  when: deploy_suc | bool
+  delegate_to: localhost
+  run_once: true
+  register: _suc_configmap_patch
+  changed_when: "'patched' in _suc_configmap_patch.stdout"
 
 - name: Patch SUC deployment with control-plane node affinity
   ansible.builtin.command:
@@ -86,27 +114,6 @@
   run_once: true
   register: _suc_patch
   changed_when: "'patched' in _suc_patch.stdout"
-
-- name: Patch SUC ConfigMap to extend job active deadline
-  ansible.builtin.command:
-    argv:
-      - kubectl
-      - patch
-      - configmap
-      - default-controller-env
-      - -n
-      - system-upgrade
-      - --kubeconfig
-      - "{{ bundle_dest }}/kube.yml"
-      - --type
-      - merge
-      - --patch
-      - '{"data":{"SYSTEM_UPGRADE_JOB_ACTIVE_DEADLINE_SECONDS":"3600"}}'
-  when: deploy_suc | bool
-  delegate_to: localhost
-  run_once: true
-  register: _suc_configmap_patch
-  changed_when: "'patched' in _suc_configmap_patch.stdout"
 
 
 - ansible.builtin.include_tasks: tasks/suc-priv-grant-tasks.yml
