@@ -21,6 +21,15 @@ This calls the [`terraform-mirantis-provision-aws` `mke3` example](https://regis
 
 With `is_bootc_based = true` (the default in this folder), a small cloud-init payload configures the image's `cloud-user` with passwordless sudo and docker-group access using the generated SSH key, which is what the `bootc-mke3` ansible playbooks expect for [machine connection](provisioning.md#machine-connection). This path does not use launchpad — MCR/MKE are baked into the `bootc-mke3` AMI, and the module's launchpad-oriented inputs/outputs are satisfied internally with placeholders and not exposed to `terraform.tfvars`.
 
+> [!NOTE]
+> Each `nodegroups.*` entry accepts a `user_data` field, but it is **silently
+> ignored whenever `is_bootc_based = true`** (the default): the module always
+> substitutes its own fixed cloud-init payload (the one described above)
+> regardless of any per-nodegroup `user_data` value. There is no way to
+> inject custom cloud-init (e.g. a no-touch join credential) through this
+> module while `is_bootc_based` is `true` — provision such nodes directly
+> (e.g. `aws ec2 run-instances --user-data ...`) outside this module instead.
+
 > [!WARNING]
 > The upstream module's default security group (name suffix `-permissive`) allows **all protocols and ports from `0.0.0.0/0`**, not just intra-VPC traffic. This is convenient for throwaway dev/test use but should be tightened before running anything longer-lived or exposed on this path.
 

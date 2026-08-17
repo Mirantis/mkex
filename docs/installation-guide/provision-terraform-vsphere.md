@@ -10,10 +10,11 @@ VSphere setup has a significant set of requirements, because VMWare clusters ten
 
 In order to proceed with this guide
 
-1. Obtain `bootc-mke3` ISO and put it to the vSphere datastore that will be used for `bootc-mke3` cluster installation
-2. Configure vSphere networking by following [MKE documentation for network preparation](https://docs.mirantis.com/mke/3.9/install/predeployment/configure-networking.html)
+1. Terraform installed locally. Unlike [the AWS module](provision-terraform-aws.md#prerequisites) (which requires `>= 1.5`), `terraform/vsphere` pins no `required_version` — use a reasonably current Terraform release.
+2. Obtain `bootc-mke3` ISO and put it to the vSphere datastore that will be used for `bootc-mke3` cluster installation
+3. Configure vSphere networking by following [MKE documentation for network preparation](https://docs.mirantis.com/mke/3.9/install/predeployment/configure-networking.html)
     - Additionally, `bootc-mke3` nodes should have access to the NTP server (customer's local one or public one) and to https://get.mirantis.com
-3. In order to provision VMs in vSphere, you need to specify credentials of a user, that can operate vSphere. For a full list of privileges needed for the user, please see [Terraform vSphere provisioner documentation](https://registry.terraform.io/providers/hashicorp/vsphere/latest/docs#notes-on-required-privileges).
+4. In order to provision VMs in vSphere, you need to specify credentials of a user, that can operate vSphere. For a full list of privileges needed for the user, please see [Terraform vSphere provisioner documentation](https://registry.terraform.io/providers/hashicorp/vsphere/latest/docs#notes-on-required-privileges).
 
 ### Image and VM template
 
@@ -95,7 +96,17 @@ Variable for `bootc-mke3` cluster infrastructure are quite self-descriptive.
 Few things that need to be mentioned:
 1. Manager and worker disk sizes should be not less that ones defined in VM template.
 2. IP addresses of managers, workers and gateway should be configured according to vSphere network configuration. DNS should be reachable by VMs.
-3. `cluster_name` variable will be used as a prefix for VM names. E.g. if cluster_name = "bootc-mke3-cluster", then names of managers will look like this: `bootc-mke3-cluster-ctr1`, `bootc-mke3-cluster-ctr2`, etc. Names of workers will look like this: `bootc-mke3-cluster-wrk1`, `bootc-mke3-cluster-wrk2`, etc.
+3. `cluster_name` variable will be used as a prefix for VM names. E.g. if cluster_name = "bootc-mke3-cluster", then names of managers will look like this: `bootc-mke3-cluster-mngr1`, `bootc-mke3-cluster-mngr2`, etc. Names of workers will look like this: `bootc-mke3-cluster-wrk1`, `bootc-mke3-cluster-wrk2`, etc.
+4. `vm_user` (required, no default) — the username the deployed VMs are
+   configured with. Current vSphere testing practice provisions the VM
+   template using the **bare** ISO variant and kickstart (see [Option
+   1](#option-1---manual) above), not cloud-init — a vSphere-specific
+   cloud-init platform build existed previously but is not what's used
+   today (see the note in [provisioning.md](provisioning.md#machines)).
+   Must match whatever user your template is actually configured to
+   create/authorize, however that template was built.
+5. `firmware` (required, no default) — `bios` or `efi`, matching how the VM
+   template itself was created.
 
 ## Procedure
 

@@ -5,8 +5,9 @@ machine join an existing Docker Swarm / MKE 3 cluster **as a worker** with no
 SSH access and no manual `docker swarm join` — "no-touch". The only per-node
 input is a worker join token and a manager endpoint, injected by whatever
 provisions the machine (kickstart for bare-metal ISO installs — the standard
-production path; cloud-init user-data on cloud-platform builds only,
-primarily used for internal testing; or systemd credentials).
+production path; cloud-init user-data on cloud-platform builds only (AMI,
+primarily used for internal testing; QCOW2, publicly announced/downloadable);
+or systemd credentials).
 
 No-touch join is the **standard process for adding machines to a cluster after
 the initial install**: production clusters typically disable SSH on cluster

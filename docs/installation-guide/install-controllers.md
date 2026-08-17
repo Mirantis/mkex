@@ -139,7 +139,7 @@ fails.
 | `kubectl apply` on a `MachineConfigChange` (or `ClusterUpgrade`) fails `strict decoding error: unknown field ...` | The CRD is stale relative to the chart actually installed — expected for `cluster-upgrade-controller` (no auto CRD apply), or for `machine-config-controller` only after an `oci://` chart override | `kubectl apply -f <chart>/crds/*.yaml` for the controller that owns the CRD |
 | A controller's pod image doesn't match `versions.txt` | The chart var was overridden to an `oci://` registry reference and that registry's chart lags the image build | Remove the override (or point `*_version` at the desired tag) and re-run; re-verify |
 | `machine-config-controller` deployment not found in namespace `mke` | Its chart hardcodes `targetNamespace: system-upgrade`; look there instead | Not a fault — expected behavior |
-| Locked out of SSH and sudo on every node | `disable_sshd_after_install`/`revoke_sudo_after_install` ran at the end of install (see [install runbook](install-bootc-mke3.md#post-install-automation)) | Break-glass recovery below |
+| Locked out of SSH and sudo on every node | `disable_sshd_after_install`/`revoke_sudo_after_install` ran during install, before the controller installs (see [install runbook](install-bootc-mke3.md#post-install-automation)) | Break-glass recovery below |
 
 ### Break-glass recovery: locked out of SSH and sudo
 

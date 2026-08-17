@@ -40,6 +40,12 @@ Types of Inventory files
         bootc-mke3-wrk1:  
   ```
 
+> [!IMPORTANT]
+> `managers` and `workers` are not just example names — every `bootc-mke3`
+> playbook hardcodes them (`hosts: managers`, `hosts: workers`,
+> `groups['managers'][0]` for the lead manager). Renaming these groups
+> breaks the install with no warning from Ansible itself.
+
 ## 4. Special Groups
 - **all**: A built-in group that contains all hosts.
   ```yaml
@@ -55,6 +61,12 @@ Types of Inventory files
       vars:
         mke_url: 172.18.180.147
       ```
+
+> [!IMPORTANT]
+> `mke_url` is required, not optional — it's consumed by the MKE install
+> flags (`--san`), the client-bundle download tasks, and the SUC privilege
+> grant. Omitting it breaks the install.
+
 ## 6. Inventory File Structure
 Here is a full inventory file example (with dummy values):
 - **YAML Format**: Modern format using the YAML syntax.

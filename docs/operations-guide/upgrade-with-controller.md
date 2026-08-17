@@ -24,6 +24,17 @@ No SSH and no Ansible inventory are required — only `kubectl` access via the
 > identically, so switching mechanisms will not work around it. Do not spend
 > time bypassing `mke3-verify-environment` before confirming your cluster's
 > storage driver is reported as `overlay2` (`docker info --format '{{.Driver}}'`).
+>
+> **This check evaluates the current, pre-upgrade engine — it is blind to
+> the upgrade target.** A cluster whose storage driver reports `overlayfs`
+> fails this check identically no matter what `spec.product.version` or
+> `spec.os.image` you specify, including the latest available release.
+> Confirmed live: two separate `ClusterUpgrade` attempts (a same-version
+> product-only CR, and a real OS+product CR targeting a newer release) both
+> failed with the identical message on every node. Retargeting to a
+> different version is not a workaround — the fleet must be re-provisioned
+> on an image that reports `overlay2` before any upgrade (via either path)
+> can proceed past this step.
 
 ## Prerequisites
 
@@ -100,6 +111,9 @@ spec:
 
 - `spec.os` is optional — omit it to upgrade the MKE product only, leaving
   the OS/MCR version unchanged.
+- `backupDir` is optional — the CRD defaults it to `/var/lib/mke-backup`.
+  Set it explicitly (as above) only if your manual backup (prerequisite #1)
+  used a different directory.
 - `controlPlaneConcurrency` and `workerConcurrency` bound how many nodes of
   each role the controller drives through the upgrade steps at once. Manager
   nodes are always upgraded serially before workers start; workers proceed in

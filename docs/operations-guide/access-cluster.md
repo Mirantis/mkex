@@ -21,13 +21,25 @@ authenticated and authorized as the MKE user that downloaded the bundle.
 
 ## Procedure
 
-### Option 1 — Download the bundle from the MKE UI
+### Option 1 — Fetch the bundle with the provided Ansible playbook
+
+If you still have the Ansible inventory used to install the cluster, this
+automates option 2 above (retries, correct headers, cleanup) and is the same
+path other playbooks in this repo use internally
+(`cluster-upgrade-controller`/`machine-config-controller` install tasks):
+
+```sh
+cd ansible
+ansible-playbook -i <path-to-your-inventory> mke-client-bundle-playbook.yml
+# bundle extracted to ansible/mke-bundle/ by default; override with -e bundle_dest=<path>
+```
+### Option 2 — Download the bundle from the MKE UI
 
 1. Log in to the MKE web UI (`https://<mke_url>`).
 2. Navigate to **My Profile** → **Client Bundles** → **New Client Bundle**.
 3. Save and unzip the bundle.
 
-### Option 2 — Download the bundle via the API
+### Option 3 — Download the bundle via the API
 
 ```sh
 export MKE_URL=<mke-host-or-ip>          # no scheme
@@ -47,6 +59,7 @@ mkdir -p mke-bundle && unzip -q bundle.zip -d mke-bundle && cd mke-bundle
 
 > Use `-k`/`--insecure` only while MKE still serves its self-signed
 > certificate; drop it once MKE has a trusted certificate installed.
+
 
 ### Use kubectl (Kubernetes API)
 
