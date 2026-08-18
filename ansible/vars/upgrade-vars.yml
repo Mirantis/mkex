@@ -11,6 +11,8 @@ mke_upgrade_check_flags: ["--force-minimums"]
 # Number of nodes that get upgraded in parallel
 upgrade_worker_batch_size: 3
 
-# OCI image reference to be upgraded. Eg. registry.mirantis.com/mkex/r9-cloud:mcr25.0-mke3.8
+# OCI image reference to be upgraded. Eg. registry.mirantis.com/bootc-mke3/r9.8-mcr29.6.1-mke3.9.5-cloud:20260814-15
+# The tag is a unique per-build identifier (not a version string) -- get the exact
+# current value from the release notes / Assets table, not by guessing.
 # For more details on how to use this variable, refer to the upgrade runbook at https://github.com/Mirantis/mkex/blob/master/docs/runbooks/upgrade-mkex.md.
 bootc_image_ref: ''
