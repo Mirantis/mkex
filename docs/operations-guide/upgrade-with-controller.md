@@ -12,36 +12,14 @@ No SSH and no Ansible inventory are required — only `kubectl` access via the
 > [Ansible upgrade runbook](upgrade-with-ansible.md). Both paths run the
 > identical underlying `mirantis/ucp upgrade` checks and commands.
 
-> [!WARNING]
-> **Known issue, tracked separately**: the embedded `mirantis/ucp upgrade
-> checks` step (`mke3-verify-environment`) can hard-fail with
-> `FAIL: storage driver is 'overlayfs', expected 'overlay2'` against
-> `bootc-mke3`'s MCR builds. None of the documented bypass flags
-> (`--force-minimums`, `--force-recent-backup`, `--force-port-check`) cover
-> this check, and no config workaround is known. This is the **same**
-> `mirantis/ucp` binary check used by the Ansible upgrade exception path's
-> `mke-upgrade-playbook.yml` — if you hit this here, that path fails
-> identically, so switching mechanisms will not work around it. Do not spend
-> time bypassing `mke3-verify-environment` before confirming your cluster's
-> storage driver is reported as `overlay2` (`docker info --format '{{.Driver}}'`).
->
-> **This check evaluates the current, pre-upgrade engine — it is blind to
-> the upgrade target.** A cluster whose storage driver reports `overlayfs`
-> fails this check identically no matter what `spec.product.version` or
-> `spec.os.image` you specify, including the latest available release.
-> Confirmed live: two separate `ClusterUpgrade` attempts (a same-version
-> product-only CR, and a real OS+product CR targeting a newer release) both
-> failed with the identical message on every node. Retargeting to a
-> different version is not a workaround — the fleet must be re-provisioned
-> on an image that reports `overlay2` before any upgrade (via either path)
-> can proceed past this step.
-
 ## Prerequisites
 
 1. **A manual MKE backup must already exist** before creating the CR. The
-   step chain looks like it runs `mke3-verify-environment` before `mke3-backup`,
-   but the verify step's embedded `ucp upgrade checks` hard-requires a backup
-   to already be present — it does not create one. On each manager:
+   automated `mke3-backup` step runs early in the chain (right after the
+   optional `mke3-docker-config` step, before `bootc-os`/`mke3-verify-environment`),
+   but the backup-presence check comes from `mirantis/ucp upgrade`'s own
+   Pre-Upgrade Checks, embedded in the **`mke3-upgrade`** step — it does not
+   create a backup itself, only requires one already be present. On each manager:
 
    ```sh
    sudo mkdir -p <backup-dir> && sudo chmod o+w <backup-dir>
@@ -135,7 +113,7 @@ kubectl get pods -n system-upgrade
 ```
 
 `.status.phase` moves through `Upgrading` (with `.status.activeStep` naming
-the current step, e.g. `mke3-verify-environment`, `mke3-backup`, `bootc-os`,
+the current step, e.g. `mke3-backup`, `bootc-os`, `mke3-verify-environment`,
 `mke3-upgrade`) to a terminal `Completed` or `Failed`.
 
 ## Expected Results
@@ -147,8 +125,8 @@ the current step, e.g. `mke3-verify-environment`, `mke3-backup`, `bootc-os`,
 
 ## Where this is documented upstream
 
-Full step-by-step behavior of each upgrade step (`mke3-verify-environment`,
-`mke3-docker-config`, `mke3-backup`, `bootc-os`, `mke3-upgrade`), additional
+Full step-by-step behavior of each upgrade step (`mke3-docker-config`,
+`mke3-backup`, `bootc-os`, `mke3-verify-environment`, `mke3-upgrade`), additional
 scenarios (product-only upgrade, Docker daemon config distribution), and the
 `cluster-upgrade-controller` install procedure itself live in the
 [`cluster-upgrade-controller`](https://github.com/Mirantis/cluster-upgrade-controller)
