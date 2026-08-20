@@ -17,7 +17,7 @@
 # To override the local bundle directory:
 #   ansible-playbook mke-post-install-playbook.yml -e bundle_dest=/tmp/my-bundle
 
-- name: Install cluster-upgrade-controller
+- name: Deploy System Upgrade Controller (SUC)
   hosts: localhost
   gather_facts: false
   vars_files:
@@ -31,7 +31,7 @@
   tasks:
     - ansible.builtin.include_tasks: tasks/cluster-upgrade-controller-tasks.yml
 
-- name: Install machine-config-controller
+- name: Install bundled controllers via chart-controller
   hosts: localhost
   gather_facts: false
   vars_files:
@@ -43,4 +43,4 @@
     mke_url: "{{ hostvars[groups['managers'][0]]['mke_url'] }}"
     bundle_dest: "{{ playbook_dir }}/mke-bundle"
   tasks:
-    - ansible.builtin.include_tasks: tasks/machine-config-controller-tasks.yml
+    - ansible.builtin.include_tasks: tasks/chart-controller-tasks.yml

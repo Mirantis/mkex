@@ -1,0 +1,78 @@
+# Bootstraps the chart-controller using the MKE3 client bundle kubeconfig,
+# then lets it install the bundled controllers (cluster-upgrade-controller,
+# machine-config-controller) from the charts staged on every node under
+# /usr/share/mke-controllers/manifests/.
+#
+# Steps:
+#   1. Fetch and extract the client bundle (kube.yml is the kubeconfig).
+#   2. Apply the Chart CRD, the machine-config-controller CRDs (helm never
+#      touches an installed chart's CRDs, so they are applied explicitly),
+#      and the chart-controller deployment.
+#   3. Wait for the chart-controller rollout.
+#   4. Apply the Chart CRs and wait until each reports a release name with no
+#      error in status.
+#
+# All manifests were fetched from a node by
+# tasks/fetch-chart-controller-apply-tasks.yml during mke-install-playbook.yml.
+#
+# Required vars (inherited from the enclosing play):
+#   admin_user  – MKE administrator username       (from vars/mke-creds.yml)
+#   admin_pass  – MKE administrator password       (from vars/mke-creds.yml)
+#   mke_url     – MKE load-balancer IP/hostname    (from inventory all.vars)
+#   bundle_dest – local directory for the bundle   (default: playbook_dir/mke-bundle)
+#   deploy_chart_controller – when true, the chart-controller and its Chart CRs
+#                             are applied (from vars/common-vars.yml)
+
+- ansible.builtin.include_tasks: tasks/mke-client-bundle-tasks.yml
+  when: deploy_chart_controller | bool
+
+- name: Apply chart-controller bootstrap manifests
+  ansible.builtin.command: >-
+    kubectl apply --kubeconfig {{ bundle_dest }}/kube.yml -f {{ playbook_dir }}/mke-bundle/apply/{{ item }}
+  loop:
+    - helm.k0sproject.io_charts.yaml
+    - machine-config-controller-crds.yaml
+    - chart-controller.yaml
+  when: deploy_chart_controller | bool
+  delegate_to: localhost
+  run_once: true
+  register: _cc_apply
+  changed_when: "'configured' in _cc_apply.stdout or 'created' in _cc_apply.stdout"
+
+- name: Wait for chart-controller rollout
+  ansible.builtin.command: >-
+    kubectl -n kube-system rollout status deployment/chart-controller
+    --kubeconfig {{ bundle_dest }}/kube.yml --timeout=180s
+  when: deploy_chart_controller | bool
+  delegate_to: localhost
+  run_once: true
+  changed_when: false
+
+- name: Apply Chart CRs for bundled controllers
+  ansible.builtin.command: >-
+    kubectl apply --kubeconfig {{ bundle_dest }}/kube.yml -f {{ playbook_dir }}/mke-bundle/apply/charts.yaml
+  when: deploy_chart_controller | bool
+  delegate_to: localhost
+  run_once: true
+  register: _cc_charts_apply
+  changed_when: "'configured' in _cc_charts_apply.stdout or 'created' in _cc_charts_apply.stdout"
+
+# On failure the last jsonpath output is printed by the exhausted until loop —
+# a non-empty error segment after /// plus `kubectl -n kube-system logs
+# deploy/chart-controller` is the diagnostic path.
+- name: Wait for each Chart release to install
+  ansible.builtin.command: >-
+    kubectl -n kube-system get chart {{ item }}
+    --kubeconfig {{ bundle_dest }}/kube.yml
+    -o jsonpath={.status.releaseName}///{.status.error}
+  loop:
+    - cluster-upgrade-controller
+    - machine-config-controller
+  when: deploy_chart_controller | bool
+  delegate_to: localhost
+  run_once: true
+  register: _chart_status
+  until: _chart_status.stdout.startswith(item) and _chart_status.stdout.endswith('///')
+  retries: 30
+  delay: 10
+  changed_when: false

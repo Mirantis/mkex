@@ -1,0 +1,29 @@
+# Fetches the chart-controller apply manifests that bootc-mirantis stages
+# into the bootc-mke3 image at build time, from a cluster node's on-disk copy
+# down to the Ansible controller.
+#
+# These are a few KB of rendered YAML (Chart CRD, MCC CRDs, chart-controller
+# deployment, Chart CRs) — the charts themselves stay on the nodes under
+# /usr/share/mke-controllers/manifests/ and are installed in-cluster by the
+# chart-controller, replacing the old tar/fetch/untar/helm flow.
+#
+# Must run while SSH access to the nodes still exists — i.e. from a play
+# with hosts: managers, before the post-install hardening step revokes it.
+# All nodes in a cluster come from the same image build, so any one manager
+# is representative (run_once: true).
+#
+# Required vars (inherited from the enclosing play):
+#   deploy_chart_controller – when true, the manifests are fetched (from vars/common-vars.yml)
+
+- name: Fetch chart-controller apply manifests staged in the bootc-mke3 image
+  ansible.builtin.fetch:
+    src: "/usr/share/mke-controllers/apply/{{ item }}"
+    dest: "{{ playbook_dir }}/mke-bundle/apply/{{ item }}"
+    flat: true
+  loop:
+    - helm.k0sproject.io_charts.yaml
+    - machine-config-controller-crds.yaml
+    - chart-controller.yaml
+    - charts.yaml
+  when: deploy_chart_controller | bool
+  run_once: true
