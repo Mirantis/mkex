@@ -121,9 +121,21 @@
   register: _cuc_ns_apply
   changed_when: "'created' in _cuc_ns_apply.stdout"
 
+# --namespace is required here: the chart's Deployment/ServiceAccount
+# templates never set metadata.namespace (only the ClusterRoleBinding's
+# subjects[].namespace references .Release.Namespace) — `helm install`
+# gets away with this because Helm's client force-places every object
+# into the release namespace regardless of what the YAML says, but plain
+# `kubectl apply` honors only what's in the manifest and otherwise falls
+# back to the kubeconfig context's default namespace ("default" here).
+# Without this flag the ServiceAccount/Deployment land in "default" while
+# the ClusterRoleBinding still points at a ServiceAccount in "mke" that
+# was never created there.
 - name: Install cluster-upgrade-controller from static manifest
   ansible.builtin.command: >-
-    kubectl apply --kubeconfig {{ bundle_dest }}/kube.yml -f {{ cluster_upgrade_controller_manifest }}
+    kubectl apply --kubeconfig {{ bundle_dest }}/kube.yml
+    --namespace {{ cluster_upgrade_controller_namespace }}
+    -f {{ cluster_upgrade_controller_manifest }}
   when: deploy_cluster_upgrade_controller | bool
   delegate_to: localhost
   run_once: true
