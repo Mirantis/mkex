@@ -1,0 +1,23 @@
+---
+# ansible-lint configuration for this repo's ansible/ tree.
+#
+# Profile: basic (see https://docs.ansible.com/projects/lint/profiles/). Added
+# while investigating PRODENG-3659 (a bootc-mke3 installer ordering defect
+# found manually, in this same ansible/ tree, with no automated check to have
+# caught it).
+#
+# As measured when this file was introduced, `ansible-lint ansible/`
+# reports 82 failures and 2 warnings at the `basic` profile, dominated by
+# missing task `name:` (52 findings) and command-instead-of-shell (14) —
+# the CI check that runs this is advisory only (does not fail the build)
+# until that backlog is worked down. `min` profile passes clean today with
+# zero findings.
+#
+# Run locally: pip install ansible-lint; ansible-lint ansible/
+profile: basic
+
+exclude_paths:
+  # Generated MKE3 client bundle (TLS keys, kubeconfig) — gitignored, but
+  # excluded here too in case a contributor runs lint locally with an
+  # already-fetched bundle present.
+  - ansible/mke-bundle/
