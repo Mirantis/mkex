@@ -29,5 +29,5 @@
 # still has SSH access to the nodes; post-install may run after sshd/sudo
 # have been revoked.
 - ansible.builtin.include_tasks: tasks/fetch-controller-manifests-tasks.yml
-- ansible.builtin.include_tasks: tasks/fetch-cluster-upgrade-controller-chart-tasks.yml
-- ansible.builtin.include_tasks: tasks/fetch-machine-config-controller-chart-tasks.yml
+- ansible.builtin.include_tasks: tasks/fetch-cluster-upgrade-controller-manifest-tasks.yml
+- ansible.builtin.include_tasks: tasks/fetch-machine-config-controller-manifest-tasks.yml

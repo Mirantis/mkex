@@ -82,47 +82,71 @@ suc_service_account: "system-upgrade:system-upgrade"
 # When true, the cluster-upgrade-controller is installed on the cluster.
 deploy_cluster_upgrade_controller: true
 
-# cluster-upgrade-controller Helm chart coordinates.
+# cluster-upgrade-controller manifest source, applied via `kubectl apply -f`.
+# Accepts a URL or a local file path resolved on the Ansible controller
+# (delegate_to: localhost) — use an absolute path or "{{ playbook_dir }}/..."
+# rather than a bare relative path.
 #
-# Default points at the chart tasks/fetch-cluster-upgrade-controller-chart-tasks.yml
-# pulls down from a cluster node's /usr/share/mke-controllers/manifests/ (the
-# exact chart bootc-mirantis staged into the image at MKE_UPGRADE_CONTROLLER_VERSION
-# build time). Using the node-fetched chart means the installed controller
-# version always matches what is actually cached on the nodes, with no
-# separate version fact in Ansible that could drift from it — and no
-# dependency on registry.mirantis.com being reachable.
+# Default points at the copy tasks/fetch-cluster-upgrade-controller-manifest-tasks.yml
+# pulls down from a cluster node's /usr/share/mke-controllers/manifests/ (a
+# plain Kubernetes manifest — `helm template ... --namespace mke
+# --include-crds` rendered once by bootc-mirantis at image-build time, not
+# a live Helm release). Using the node-fetched copy means the installed
+# controller version always matches what is actually cached on the nodes,
+# with no separate version fact in Ansible that could drift from it — and
+# no dependency on registry.mirantis.com being reachable.
 #
-# cluster_upgrade_controller_version is only consulted when
-# cluster_upgrade_controller_chart is an "oci://..." reference (see the
-# install task's oci-vs-local branch) — set the chart back to the OCI URL
-# to deliberately install a version other than the one preloaded on this
-# image build, or when mke-post-install-playbook.yml runs standalone from a
-# different playbook_dir than the one that ran mke-install-playbook.yml.
-cluster_upgrade_controller_release_name: "cluster-upgrade-controller"
-cluster_upgrade_controller_chart: "{{ playbook_dir }}/mke-bundle/cluster-upgrade-controller-chart"
-cluster_upgrade_controller_version: "0.1.3"
+# Override to a URL or a different local/mirrored copy in two cases:
+#   1. You deliberately want a controller version other than the one
+#      preloaded on this image build (accepts the tradeoff of an online
+#      pull, or air-gap it yourself).
+#   2. mke-post-install-playbook.yml is being run standalone/disconnected
+#      from mke-install-playbook.yml (its own header documents this as a
+#      supported flow) — the node-fetched default above only exists on the
+#      controller that ran mke-install-playbook.yml in the same
+#      playbook_dir. Point this at a URL or a path reachable from wherever
+#      post-install actually runs.
+cluster_upgrade_controller_manifest: "{{ playbook_dir }}/mke-bundle/controller-manifests/cluster-upgrade-controller-manifest.yaml"
+
+# Namespace the manifest's resources are rendered for; pre-created (if
+# absent) before the manifest is applied, since `kubectl apply` never
+# creates a namespace on its own.
 cluster_upgrade_controller_namespace: "mke"
 
 # When true, the machine-config-controller is installed on the cluster.
 deploy_machine_config_controller: true
 
-# machine-config-controller Helm chart coordinates.
+# machine-config-controller manifest source, applied via `kubectl apply -f`.
+# Accepts a URL or a local file path resolved on the Ansible controller
+# (delegate_to: localhost) — use an absolute path or "{{ playbook_dir }}/..."
+# rather than a bare relative path.
 #
-# Default points at the chart tasks/fetch-machine-config-controller-chart-tasks.yml
-# pulls down from a cluster node's /usr/share/mke-controllers/manifests/ (the
-# exact chart bootc-mirantis staged into the image at build time). Using the
-# node-fetched chart means the installed controller version always matches
-# what is actually cached on the nodes, with no separate version fact in
-# Ansible that could drift from it — and no dependency on
-# registry.mirantis.com being reachable.
+# Default points at the copy tasks/fetch-machine-config-controller-manifest-tasks.yml
+# pulls down from a cluster node's /usr/share/mke-controllers/manifests/ (a
+# plain Kubernetes manifest — `helm template ... --namespace mke
+# --include-crds` rendered once by bootc-mirantis at image-build time, not
+# a live Helm release). Using the node-fetched copy means the installed
+# controller version always matches what is actually cached on the nodes,
+# with no separate version fact in Ansible that could drift from it — and
+# no dependency on registry.mirantis.com being reachable.
 #
-# machine_config_controller_version is only consulted when
-# machine_config_controller_chart is an "oci://..." reference (see the
-# install task's oci-vs-local branch) — set the chart back to the OCI URL
-# to deliberately install a version other than the one preloaded on this
-# image build, or when mke-post-install-playbook.yml runs standalone from a
-# different playbook_dir than the one that ran mke-install-playbook.yml.
-machine_config_controller_release_name: "machine-config-controller"
-machine_config_controller_chart: "{{ playbook_dir }}/mke-bundle/machine-config-controller-chart"
-machine_config_controller_version: "0.1.4"
+# Override to a URL or a different local/mirrored copy in two cases:
+#   1. You deliberately want a controller version other than the one
+#      preloaded on this image build (accepts the tradeoff of an online
+#      pull, or air-gap it yourself).
+#   2. mke-post-install-playbook.yml is being run standalone/disconnected
+#      from mke-install-playbook.yml (its own header documents this as a
+#      supported flow) — the node-fetched default above only exists on the
+#      controller that ran mke-install-playbook.yml in the same
+#      playbook_dir. Point this at a URL or a path reachable from wherever
+#      post-install actually runs.
+machine_config_controller_manifest: "{{ playbook_dir }}/mke-bundle/controller-manifests/machine-config-controller-manifest.yaml"
+
+# Namespace pre-created (if absent) before the manifest is applied, since
+# `kubectl apply` never creates a namespace on its own. Note: the chart
+# this manifest was rendered from hardcodes its Deployment's own namespace
+# to "system-upgrade" internally regardless of this value — the pod lands
+# there, not here. Kept for parity with cluster-upgrade-controller and
+# because other resources in the manifest (e.g. CRDs are cluster-scoped,
+# but any namespaced non-Deployment resource) still render into this one.
 machine_config_controller_namespace: "mke"

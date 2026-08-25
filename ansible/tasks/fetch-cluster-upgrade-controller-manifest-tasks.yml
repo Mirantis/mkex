@@ -1,0 +1,32 @@
+# Fetches the cluster-upgrade-controller manifest that bootc-mirantis
+# renders and stages into the bootc-mke3 image at build time, from a
+# cluster node's on-disk copy down to the Ansible controller — the same
+# air-gap/drift rationale as tasks/fetch-controller-manifests-tasks.yml
+# (which does this for SUC's manifests), applied to this controller's own
+# manifest.
+#
+# This is plain, pre-rendered Kubernetes YAML (`helm template
+# cluster-upgrade-controller <chart> --namespace mke --include-crds`, done
+# once at image-build time — see bootc-mirantis's Makefile
+# `helpers/controllers` target), not a live Helm release: the controller
+# image tag and its CRDs are already baked into the file. Fetching it here
+# means the installed controller version always matches what is already
+# cached on the nodes, with nothing in Ansible tracking the controller
+# version as a separate fact that could drift from it, and no dependency on
+# registry.mirantis.com being reachable.
+#
+# Must run while SSH access to the nodes still exists — i.e. from a play
+# with hosts: managers, before the post-install hardening step revokes it.
+# All nodes come from the same image build, so any one manager is
+# representative (run_once: true).
+#
+# Required vars (inherited from the enclosing play):
+#   deploy_cluster_upgrade_controller – when true, the manifest is fetched
+
+- name: Fetch the pinned cluster-upgrade-controller manifest staged in the bootc-mke3 image
+  ansible.builtin.fetch:
+    src: /usr/share/mke-controllers/manifests/cluster-upgrade-controller-manifest.yaml
+    dest: "{{ playbook_dir }}/mke-bundle/controller-manifests/cluster-upgrade-controller-manifest.yaml"
+    flat: true
+  when: deploy_cluster_upgrade_controller | bool
+  run_once: true
