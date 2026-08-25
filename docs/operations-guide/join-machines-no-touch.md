@@ -97,20 +97,34 @@ whichever delivery path you use:
 - **Kernel module preload.** Baked-in host hardening sets
   `kernel.modules_disabled=1`, which blocks loading the `xt_statistic`
   kernel module on any node whose kube-proxy starts *after* that lockdown
-  sysctl has already applied — which is every node except whichever one
-  happened to win the boot-time race during the initial cluster stand-up,
-  so this recurs on every no-touch-joined worker. Symptom: calico-node's
-  install-cni init container `CrashLoopBackOff`, with kube-proxy logging
-  `iptables-restore: Couldn't load match 'statistic'`. Preload the module
-  via `/etc/modules-load.d/xt_statistic.conf` (content: the single line
-  `xt_statistic`) — `systemd-modules-load.service` is ordered
-  `Before=systemd-sysctl.service`, so a module listed there loads before
-  the lockdown sysctl applies, but only on the *next* boot. A
-  no-touch-joined worker is already running with the module unavailable, so
-  it needs a self-triggered reboot after joining — gated on the join
-  sentinel (`/var/lib/mke3/joined`, see
-  [no-touch join](no-touch-join.md)) so it can't race the join itself,
-  via a small oneshot unit that polls then reboots.
+  sysctl has already applied — which used to be every node except whichever
+  one happened to win the boot-time race during the initial cluster
+  stand-up. **On any image built from current `bootc-mirantis` `main`, this
+  no longer applies**: `xt_statistic` is preloaded via
+  `dracut-mke-modules.conf`/`mke-modules.conf` and is present on **first
+  boot**, before the lockdown sysctl ever applies, on every node including
+  no-touch-joined workers — confirmed with zero `calico-node` restarts
+  across managers, Ansible-joined workers, and no-touch-joined workers on
+  the same image. On an **older** image (predating that fix) the symptom is
+  calico-node's `install-cni` init container `CrashLoopBackOff`, with
+  kube-proxy logging `iptables-restore: Couldn't load match 'statistic'`.
+  Preload the module via `/etc/modules-load.d/xt_statistic.conf` (content:
+  the single line `xt_statistic`) — `systemd-modules-load.service` is
+  ordered `Before=systemd-sysctl.service`, so a module listed there loads
+  before the lockdown sysctl applies, but only on the *next* boot, so an
+  already-running no-touch-joined worker needs a self-triggered reboot,
+  gated on the join sentinel (`/var/lib/mke3/joined`, see [no-touch
+  join](no-touch-join.md)) so it can't race the join itself.
+
+  **The examples below check for the module before rebooting, so on a
+  current image the reboot is skipped entirely.** Confirmed necessary: on
+  an image where the module is already preloaded, unconditionally
+  rebooting every joined worker restarts `calico-node` for no reason and
+  produces a transient, unhelpful `docker node ls` "Down" reading right
+  after each join (harmless, self-resolves, but needlessly alarming and
+  needlessly disruptive). Keep the check even once you're confident your
+  fleet's images are current — it costs nothing and protects against
+  accidentally joining an older image into the mix.
 
 #### Bare metal (kickstart — the standard path; file shredded after join)
 
@@ -142,7 +156,7 @@ ConditionPathExists=!/var/lib/mke3/postjoin-reboot-done
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c 'for i in $(seq 1 60); do [ -f /var/lib/mke3/joined ] && break; sleep 5; done; [ -f /var/lib/mke3/joined ] && touch /var/lib/mke3/postjoin-reboot-done && systemctl reboot'
+ExecStart=/bin/sh -c 'for i in $(seq 1 60); do [ -f /var/lib/mke3/joined ] && break; sleep 5; done; [ -f /var/lib/mke3/joined ] || exit 0; touch /var/lib/mke3/postjoin-reboot-done; lsmod | grep -q xt_statistic && exit 0; systemctl reboot'
 EOF
 systemctl enable --now mke3-postjoin-reboot.service
 %end
@@ -181,7 +195,7 @@ write_files:
 
       [Service]
       Type=oneshot
-      ExecStart=/bin/sh -c 'for i in $(seq 1 60); do [ -f /var/lib/mke3/joined ] && break; sleep 5; done; [ -f /var/lib/mke3/joined ] && touch /var/lib/mke3/postjoin-reboot-done && systemctl reboot'
+      ExecStart=/bin/sh -c 'for i in $(seq 1 60); do [ -f /var/lib/mke3/joined ] && break; sleep 5; done; [ -f /var/lib/mke3/joined ] || exit 0; touch /var/lib/mke3/postjoin-reboot-done; lsmod | grep -q xt_statistic && exit 0; systemctl reboot'
 runcmd:
   - firewall-cmd --zone=trusted --add-interface=lo --permanent
   - firewall-cmd --zone=public --add-service=mke_worker_internal --permanent
