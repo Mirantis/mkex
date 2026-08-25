@@ -42,7 +42,7 @@ machine_config_controller_namespace`), but its Deployment hardcodes
 On any booted cluster node, `/usr/share/mke-controllers/` holds exactly what
 that image build baked in:
 
-- `versions.txt` — the exact image and chart references/tags for every
+- `versions.txt` — the exact image references/tags for every
   controller and upgrade-job image shipped in this build. Always read a
   controller's version from this file on a live node. Never hand-guess a
   tag, or copy one from a previous build, an example in this doc, or memory

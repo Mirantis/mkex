@@ -46,7 +46,7 @@ Cluster should consist of one or more compute machine nodes. In order to use `bo
 1. All machines must use the `bootc-mke3` source base (image). For available images see [Assets section](../../README.md#assets)
 
 > [!NOTE]
-> **Simple** ISO edition is used mostly for demo/test purposes. For production-grade clusters consider using **Generic** ISO. QCOW2 is considered production-grade by default, although it is user's responsibility to customise it in a proper and secure way.
+> **Simple** ISO edition is used mostly for demo/test purposes. For production-grade clusters consider using **Generic** ISO. The QCOW2 cloud image ships uncustomised — it is the user's responsibility to customise and secure it appropriately for production use.
 
 > [!IMPORTANT]
 > Machine customization at provision time is done via **kickstart** for

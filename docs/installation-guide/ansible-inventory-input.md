@@ -100,7 +100,7 @@ Here is a full inventory file example (with dummy values):
 
 ## FAQ
 ### How to generate ansible inventory from our Terraform provision modules
-Since we have created our terraform charts with the thought of coupling it with ansible, it's very easy to generate inventory file. 
+Our Terraform provision modules are designed to couple with Ansible, so generating an inventory file is straightforward.
 
   1. In the terraform directory of the appropriate provider e.g. for vsphere **terraform/vsphere/**, execute the command `terraform apply`
   2. Execute the output command for your platform:

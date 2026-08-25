@@ -23,11 +23,13 @@ datastore = "/MIRANTIS/datastore/iscsi-storage-mcc"
 network = "VMWare-MCC-Hosted"
 folder = "/MCC-Hosted/demo1"
 
-# Path in vSphere to VM template that will be used for manager nodes
-manager_vm_template = "/MIRANTIS/vm/MCC-Hosted/Ubuntu-20.04-k0s-tmpl"
+# Path in vSphere to VM template that will be used for manager nodes.
+# Create the template from the bootc-mke3 bare ISO + kickstart — see
+# docs/installation-guide/provision-terraform-vsphere.md
+manager_vm_template = "/MIRANTIS/vm/MCC-Hosted/bootc-mke3-r9.8-tmpl"
 
 # Path in vSphere to VM template that will be used for worker nodes
-worker_vm_template = "/MIRANTIS/vm/MCC-Hosted/Ubuntu-20.04-k0s-tmpl"
+worker_vm_template = "/MIRANTIS/vm/MCC-Hosted/bootc-mke3-r9.8-tmpl"
 
 # SSH keys
 # Those keys will used to access the machines through SSH
@@ -87,7 +89,7 @@ firmware = "efi"
 
 # This name will be used as a prefix for VM names
 # E.g. if cluster_name = "mkex-cluster", then names of managers will look like this:
-# "mkex-cluster-ctr1", "mke-cluster-ctr2", etc.
+# "mkex-cluster-mngr1", "mkex-cluster-mngr2", etc.
 # Names of workers will look like this:
 # "mkex-cluster-wrk1", "mkex-cluster-wrk2", etc.
 cluster_name = "mkex-cluster"
