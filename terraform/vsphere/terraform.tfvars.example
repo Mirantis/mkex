@@ -88,11 +88,11 @@ nameserver = "172.18.176.6"
 firmware = "efi"
 
 # This name will be used as a prefix for VM names
-# E.g. if cluster_name = "mkex-cluster", then names of managers will look like this:
-# "mkex-cluster-mngr1", "mkex-cluster-mngr2", etc.
+# E.g. if cluster_name = "mke-cluster", then names of managers will look like this:
+# "mke-cluster-mngr1", "mke-cluster-mngr2", etc.
 # Names of workers will look like this:
-# "mkex-cluster-wrk1", "mkex-cluster-wrk2", etc.
-cluster_name = "mkex-cluster"
+# "mke-cluster-wrk1", "mke-cluster-wrk2", etc.
+cluster_name = "mke-cluster"
 
 # Name of the user that will be used to access the cluster through SSH.
 # This user will be in sudoers group
