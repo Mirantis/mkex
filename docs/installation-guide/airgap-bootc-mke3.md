@@ -32,6 +32,14 @@ Practically: for a fully air-gapped run you need, at minimum, the
 their manifests and container images come from what bootc-mirantis already
 staged into the image, fetched from a node rather than the network.
 
+## Verify the mirrored image's signature
+
+`bootc-mirantis` cosign-signs the `bootc_image_ref` OS image it pushes to
+`registry.mirantis.com`. Verify that signature against the source registry
+before mirroring, and again against your internal registry afterwards if
+your mirroring tool is not known to copy signature artifacts — see
+[Verify bootc-mke3 image signatures](../operations-guide/verify-image-signatures.md).
+
 ## Ansible variables to set
 
 ### `vars/reg-creds` (copy from `vars/reg-creds.example`, gitignored)

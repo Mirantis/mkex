@@ -65,6 +65,10 @@ below — do not guess or hand-construct this reference.
 > you learn the reference was wrong. Always copy it verbatim from
 > `versions.txt`.
 
+If `spec.os.image` is set, verify its cosign signature before applying the
+CR — see
+[Verify bootc-mke3 image signatures](verify-image-signatures.md#at-installswitch-time).
+
 ### 2. Apply the `ClusterUpgrade` CR
 
 ```yaml
