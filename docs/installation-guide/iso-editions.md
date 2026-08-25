@@ -40,6 +40,10 @@ fi
 ```
 where `<oci-name>` is the name of the `bootc-mke3` OCI image, of the form `registry.mirantis.com/bootc-mke3/r<rocky-version>-mcr<mcr-version>-mke<mke-version>-bare:<build-tag>` (for example, `registry.mirantis.com/bootc-mke3/r9.8-mcr29.6.1-mke3.9.5-bare:20260814-15`) — `<build-tag>` is a unique per-build identifier, not derived from the version, so it always changes between builds even at the same MCR/MKE/Rocky version; check the [Assets section](../../README.md#assets) or the current release notes for the exact current tag. If you're not planning to perform air-gapped installation and/or use your own image registry, go with the default `bootc-mke3` image for your target platform.
 
+Verify `<oci-name>`'s cosign signature before putting it in the kickstart
+file — see
+[Verify bootc-mke3 image signatures](../operations-guide/verify-image-signatures.md).
+
 > [!WARNING]
 > It's user's responsibility to add those specific kickstart file lines. If it wasn't done, `bootc-mke3` won't be installed properly.
 
