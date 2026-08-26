@@ -127,6 +127,15 @@ the current step, e.g. `mke3-backup`, `bootc-os`, `mke3-verify-environment`,
 - The MKE UI/API and `docker version` report the target product version; if
   an OS image was specified, `bootc status` on each node shows it as booted.
 
+## Rollback
+
+If `.status.phase` reaches `Failed` instead, the same CR can revert the
+steps it already applied — OS, MCR, and MKE together — via
+`spec.rollback.requested`. See
+[Roll back a bootc-mke3 upgrade](rollback-bootc-mke3.md) for the
+prerequisites, the per-step undo table (what is and isn't reverted), and
+the procedure.
+
 ## Where this is documented upstream
 
 Full step-by-step behavior of each upgrade step (`mke3-docker-config`,
