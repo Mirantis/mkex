@@ -25,8 +25,10 @@ confidential data, and delete them from nodes once they are collected.
 
 1. `kubectl` configured from an MKE client bundle — see
    [Access the cluster](access-cluster.md).
-2. The privilege grant and the `cluster-support` namespace from
-   [Run privileged support containers on MKE](privileged-support-containers.md).
+2. The `cluster-support` namespace from
+   [Run privileged support containers on MKE](privileged-support-containers.md),
+   plus that runbook's privilege grant if support work is done by non-admin MKE
+   users (an admin client bundle does not need it).
 3. `envsubst` (package `gettext`/`gettext-base`) on your workstation.
 4. The cluster's MKE version for the image tag, as in
    [the debug shell runbook](node-debug-shell.md#requirements). The collector
@@ -66,8 +68,10 @@ for node in $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do
   NODE_NAME=$node envsubst < capture-job.yaml.tmpl | kubectl create -f -
 done
 
-# Only managers
-for node in $(kubectl get nodes -l node-role.kubernetes.io/control-plane -o jsonpath='{.items[*].metadata.name}'); do
+# Only managers.
+# MKE 3 labels managers node-role.kubernetes.io/master, not
+# .../control-plane — check with: kubectl get nodes --show-labels
+for node in $(kubectl get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[*].metadata.name}'); do
   NODE_NAME=$node envsubst < capture-job.yaml.tmpl | kubectl create -f -
 done
 
@@ -81,9 +85,11 @@ NODE_NAME=<node-name> envsubst < capture-job.yaml.tmpl | kubectl create -f -
 kubectl -n cluster-support get jobs -l app=log-capture -w
 ```
 
-A capture that includes the `mke3` collector takes minutes per node — that
-collector runs MKE's own support command with a 20-minute timeout. To block
-until every Job is done:
+How long a capture takes is dominated by the `mke3` collector, which runs MKE's
+own support command with a 20-minute timeout. Measured on a 3-manager MKE 3.9.5
+cluster: 25-26 seconds per node for all five collectors, producing a 1.9 MB
+bundle of which 1.75 MB is the MKE support tarball. A loaded or larger node can
+take considerably longer, so bound the wait generously rather than tightly:
 
 ```sh
 kubectl -n cluster-support wait --for=condition=complete job -l app=log-capture --timeout=45m
@@ -106,11 +112,14 @@ from, at `/var/log/cluster-support/<name>-<node>-<timestamp>.tar.gz`. Open a
 involved:
 
 ```sh
-NODE_NAME=<node-name> envsubst < debug-shell-pod.yaml.tmpl | kubectl apply -f -
-kubectl -n cluster-support exec debug-shell-<node-name> -- ls -lh /host/var/log/cluster-support/
+node=<node-name>
+NODE_NAME=$node NODE_SLUG=$(printf '%s' "$node" | tr '.' '-') \
+  envsubst < debug-shell-pod.yaml.tmpl | kubectl apply -f -
+slug=$(printf '%s' "$node" | tr '.' '-')
+kubectl -n cluster-support exec debug-shell-$slug -- ls -lh /host/var/log/cluster-support/
 kubectl -n cluster-support cp \
-  debug-shell-<node-name>:/host/var/log/cluster-support/<bundle>.tar.gz ./<bundle>.tar.gz
-kubectl -n cluster-support delete pod debug-shell-<node-name>
+  debug-shell-$slug:/host/var/log/cluster-support/<bundle>.tar.gz ./<bundle>.tar.gz
+kubectl -n cluster-support delete pod debug-shell-$slug
 ```
 
 Use the PVC or S3 destination instead when you want every node's bundle to
@@ -148,9 +157,10 @@ commented in the template:
 | `COLLECTORS` | Space-separated collector names, e.g. `"journal system"`. Unset runs all five. |
 | `JOURNAL_SINCE` | Passed verbatim to `journalctl --since`. Default `24 hours ago`. |
 
-The `mke3` collector is the slow one. Dropping it (`COLLECTORS: "journal mcr
-bootc system"`) turns a multi-minute capture into a fast one, at the cost of the
-MKE-level bundle a support case usually wants.
+The `mke3` collector is the expensive one and the only collector that can run for
+many minutes. Dropping it (`COLLECTORS: "journal mcr bootc system"`) leaves a
+capture that finishes in seconds, at the cost of the MKE-level bundle a support
+case usually wants.
 
 ## Destinations
 
@@ -168,12 +178,17 @@ enabled destination receives the same tarball.
 
 Uncomment the `bundles` volume and its `/pvc` mount in the Job template and set
 `claimName` to a claim that already exists in `cluster-support` — nothing here
-creates or deletes claims.
+creates or deletes claims. A default `bootc-mke3` cluster ships **no**
+StorageClass (`kubectl get storageclass` is empty), so this destination requires
+storage you have provisioned yourself.
 
 The claim **must be `ReadWriteMany`** when capturing more than one node at a
 time: one Pod per node mounts it concurrently. With `ReadWriteOnce`, Pods on
 every other node stay `Pending` until `activeDeadlineSeconds` (2400s) expires
 and their Jobs fail. For a `ReadWriteOnce` claim, capture one node at a time.
+
+> Unlike the hostPath and S3 destinations, this one is not covered by the
+> verification behind this runbook — the test cluster had no StorageClass.
 
 ### S3
 
@@ -192,13 +207,31 @@ The object is written to
 folder. `S3_REGION` defaults to `us-east-1` when unset, which matters because it
 is part of the request signature.
 
-The upload uses `curl --aws-sigv4`, which requires curl 7.75 or newer in the
-collector image; `mirantis/ucp-dsinfo` (Ubuntu 22.04 based, curl 7.81) has it.
-If you substitute a different collector image whose curl is older, the capture
-logs `this image's curl lacks --aws-sigv4` and the other destinations still
-receive the bundle. Uploads are bounded (`--connect-timeout 30 --max-time 300
---retry 3`) so an unreachable endpoint fails the destination instead of holding
-a privileged Pod on the node.
+> [!IMPORTANT]
+> **The S3 destination needs a collector image with curl 8 or newer, which
+> `mirantis/ucp-dsinfo` is not.** That image (Ubuntu 22.04) ships curl 7.81.0,
+> which advertises `--aws-sigv4` but computes an upload signature the server
+> rejects: verified against an S3-compatible endpoint, curl 7.81.0 returns
+> `SignatureDoesNotMatch` while curl 8.14.1 and 8.15.0 accept the identical
+> request, credentials, region, and URL. `capture.sh` checks the version and
+> logs `signs sigv4 uploads incorrectly` rather than producing a silent 403.
+>
+> For the S3 destination, swap the collector container's image and command:
+>
+> ```yaml
+>           image: alpine:3.21
+>           command: ["sh","-c","apk add --no-cache bash util-linux tar gzip curl >/dev/null && exec bash /scripts/capture.sh"]
+> ```
+>
+> This is verified working end to end (curl 8.14.1). The collectors themselves
+> are unaffected by the image: every host command runs through
+> `nsenter --target 1` against the node's own binaries, so the container only
+> needs `bash`, `nsenter`, `tar`, `gzip`, and `curl`. In an air-gapped cluster,
+> mirror an image that already contains those rather than relying on `apk`.
+
+Uploads are bounded (`--connect-timeout 30 --max-time 300 --retry 3`) so an
+unreachable endpoint fails the destination instead of holding a privileged Pod on
+the node.
 
 ## Failure semantics
 
@@ -206,8 +239,18 @@ A capture is deliberately fault-tolerant — the node needing a bundle is often
 already broken:
 
 - A collector command that fails writes its stderr to `<file>.err` beside the
-  output file and does not abort the bundle. An `.err` file present in a bundle
-  always means that command actually failed; empty ones are removed.
+  output file and does not abort the bundle. Empty `.err` files are removed.
+- **An `.err` file does not by itself mean failure.** Several host commands write
+  to stderr on success, so the bundle routinely contains large `.err` files next
+  to a healthy capture:
+  - `docker logs <container>` sends a container's own stderr stream to stderr, so
+    for MKE containers that log there, `docker-logs-<name>.log` is empty and
+    `docker-logs-<name>.log.err` holds the actual logs. Read the `.err` file.
+  - `mke3-support.err` is progress output from MKE's support command; the
+    `mke3-support.tgz` beside it is still valid.
+  - `daemon.json.err` and `journal-previous-boot.log.err` appear on a healthy
+    node that has no `/etc/docker/daemon.json` and no prior boot.
+  Use `collectors.txt` for pass/fail, and `.err` files as context.
 - `collectors.txt` records `<collector> <exit-code>` per collector, so the
   bundle states what ran.
 - A Job **fails only when no destination received the tarball**. Partial

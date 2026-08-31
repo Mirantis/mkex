@@ -86,13 +86,19 @@ data:
     fi
 
     if [ -n "${S3_BUCKET:-}" ]; then
-      # curl signs the upload itself (--aws-sigv4, curl 7.75+), so no S3 client
-      # or credential file is needed in the image. Credentials arrive as env
-      # from a Secret and never touch this ConfigMap.
+      # curl signs the upload itself (--aws-sigv4), so no S3 client or
+      # credential file is needed in the image. Credentials arrive as env from a
+      # Secret and never touch this ConfigMap.
+      #
+      # curl 8+ is required, not merely a curl that accepts the flag: 7.81
+      # (Ubuntu 22.04, i.e. mirantis/ucp-dsinfo) advertises --aws-sigv4 but
+      # computes an upload signature the server rejects with
+      # SignatureDoesNotMatch. Verified working on curl 8.14.1 and 8.15.0.
+      curl_major="$(curl --version 2>/dev/null | awk 'NR==1 {split($2, v, "."); print v[1]+0}')"
       if [ -z "${S3_ENDPOINT:-}" ]; then
         echo "capture: S3_BUCKET set but S3_ENDPOINT is empty" >&2
-      elif ! curl --help all 2>/dev/null | grep -q -- '--aws-sigv4'; then
-        echo "capture: this image's curl lacks --aws-sigv4 (needs curl 7.75+); cannot upload to S3" >&2
+      elif [ "${curl_major:-0}" -lt 8 ]; then
+        echo "capture: this image's curl ($(curl --version 2>/dev/null | awk 'NR==1{print $2}')) signs sigv4 uploads incorrectly; the S3 destination needs a collector image with curl 8+" >&2
       else
         S3_URL="${S3_ENDPOINT%/}/${S3_BUCKET}/${S3_PREFIX:-}${BUNDLE}.tar.gz"
         # Bounded timeouts and retries: an unreachable endpoint must report a
@@ -100,7 +106,7 @@ data:
         # Job's activeDeadlineSeconds elapses.
         if curl -sS --fail \
           --connect-timeout 30 --max-time 300 --retry 3 \
-          --aws-sigv4 "aws:amz:${S3_REGION:-us-east-1},s3" \
+          --aws-sigv4 "aws:amz:${S3_REGION:-us-east-1}:s3" \
           --user "${AWS_ACCESS_KEY_ID:-}:${AWS_SECRET_ACCESS_KEY:-}" \
           -T "${TARBALL}" "${S3_URL}"; then
           echo "capture: uploaded ${BUNDLE}.tar.gz to ${S3_BUCKET}/${S3_PREFIX:-}"

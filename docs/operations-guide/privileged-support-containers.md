@@ -3,10 +3,24 @@
 Support tooling for a `bootc-mke3` node runs as a privileged container on that
 node: it needs the host root filesystem, the host PID namespace, and
 `nsenter --target 1` to reach host binaries such as `journalctl`, `docker`, and
-`bootc`. MKE 3 rejects such pods by default. This runbook grants one
-ServiceAccount the privilege attributes those pods request.
+`bootc`. MKE 3 refuses such pods **when the identity creating them is not an
+MKE admin**. This runbook grants one ServiceAccount the privilege attributes
+those pods request.
 
-It is the shared prerequisite for:
+Whether you need it depends on who runs the support runbooks:
+
+| Creating identity | Grant needed? |
+|---|---|
+| MKE admin client bundle (what `mke-install-playbook.yml` fetches) | No — admins bypass the attribute check. |
+| Any non-admin MKE user, even with Kubernetes RBAC to create pods | **Yes** — creation is refused without it. |
+
+Verified on MKE 3.9.5: an admin bundle created privileged pods and capture Jobs
+with only `system-upgrade:system-upgrade` on the allowlist, while a non-admin
+user with `create pods` in the namespace was refused until the grant below was
+applied. Run the grant if support work is ever done by non-admin operators;
+skip it if every operator uses an admin bundle.
+
+It applies to both support runbooks, which create exactly these pods:
 
 - [Open a debug shell on a node](node-debug-shell.md)
 - [Collect support bundles from nodes](collect-support-bundles.md)
@@ -34,21 +48,33 @@ Consequences to accept before running the procedure:
 3. A workstation with `kubectl` configured from an MKE client bundle (see
    [Access the cluster](access-cluster.md)), plus `curl`.
 
-## What MKE rejects without the grant
+## What MKE refuses without the grant
 
-MKE 3's `UCPAuthorization` admission controller denies pods that request
+MKE 3's authorization layer refuses pods from non-admin identities that request
 privilege attributes unless the pod's ServiceAccount is on a cluster-level
-allowlist. Applying a privileged support pod without the grant fails with:
+allowlist. The refusal names both the identity and the attributes:
 
 ```text
-Error from server: admission webhook "ucp.validating.webhook" denied the request:
-[cluster-support:default] lack required permissions to use attributes
-[hostbindmounts hostpid privileged]
+Error from server (Forbidden): error when creating "STDIN": pods "nonadmin-probe" is
+forbidden: non-admin user "7258aa56-4af3-4910-a86b-e25e5d2b24f9" [service account
+"cluster-support:default"]. The configured privileged attributes access for non-admin
+users ("[]")("[]") and for service accounts ("[hostbindmounts hostipc hostnetwork
+hostpid kernelcapabilities privileged]")("[system-upgrade:system-upgrade]") lack
+required permissions to use attributes [hostbindmounts hostpid privileged] for
+resource nonadmin-probe
 ```
 
-The attribute names in the message correspond to what the pod asked for:
-`privileged` (a privileged container), `hostbindmounts` (a `hostPath` volume),
-and `hostpid` (`spec.hostPID: true`).
+Reading it:
+
+- `non-admin user "<uuid>"` — Kubernetes sees an MKE user as their account UUID,
+  not their username.
+- The two bracketed pairs are the current allowlists: attributes permitted for
+  non-admin users and their subjects, then attributes permitted for service
+  accounts and the subjects holding them. Here only
+  `system-upgrade:system-upgrade` is granted — that entry is added by the
+  install for the System Upgrade Controller.
+- `attributes [hostbindmounts hostpid privileged]` is what the pod asked for:
+  a `hostPath` volume, `spec.hostPID: true`, and a privileged container.
 
 Upstream reference:
 [admission controllers for access control](https://docs.mirantis.com/mke/3.9/ops/deploy-apps-k8s/admission-controllers-for-access.html).
@@ -93,16 +119,17 @@ and **preserving any entries already present**:
 ```toml
 [cluster_config]
   priv_attributes_allowed_for_service_accounts = ["hostIPC", "hostNetwork", "hostPID", "hostBindMounts", "privileged", "kernelCapabilities"]
-  priv_attributes_service_accounts = ["cluster-support:default"]
+  priv_attributes_service_accounts = ["system-upgrade:system-upgrade", "cluster-support:default"]
 ```
 
 - `priv_attributes_allowed_for_service_accounts` — the attributes that may be
   granted at all. These six are every attribute the admission controller
-  supports.
+  supports, and a default `bootc-mke3` install already sets all six.
 - `priv_attributes_service_accounts` — the `<namespace>:<serviceaccount>`
-  entries that may use them. Append `cluster-support:default` to whatever is
-  already there; overwriting this array revokes other components' grants (for
-  example the System Upgrade Controller's).
+  entries that may use them. **Append** `cluster-support:default`; a default
+  install already contains `system-upgrade:system-upgrade` for the System
+  Upgrade Controller, and overwriting the array revokes that grant. The example
+  above shows the merged result.
 
 Upload the edited file:
 
@@ -119,7 +146,9 @@ rm -f mke-config.toml     # the file is cluster configuration, not a secret, but
 > certificate; drop it once MKE has a trusted certificate installed.
 
 The change takes effect on the next admission decision; no MKE restart is
-required.
+required. Verified on MKE 3.9.5: a creation refused seconds earlier succeeded on
+the first retry after the `PUT` returned 200, and the pre-existing
+`system-upgrade:system-upgrade` entry survived the edit.
 
 ### 3. Verify the grant
 
@@ -132,8 +161,8 @@ kubectl -n cluster-support run grant-check --image=mirantis/ucp-dsinfo:3.9.5 --r
 kubectl -n cluster-support delete pod grant-check
 ```
 
-Creation succeeding — rather than the webhook denying it with the error above —
-proves the grant. The pod runs `true` and exits.
+Creation succeeding — rather than being refused with the error above — proves the
+grant. The pod runs `true` and exits.
 
 ## Automated alternative
 
@@ -188,18 +217,23 @@ its own — it lists what *may* be granted; without an entry in
 
 ### I am an MKE admin — do I need this at all?
 
-Possibly not: admin identities may bypass the attribute check. Run the grant
-anyway. The runbooks are written for the `cluster-support:default`
-ServiceAccount so that they behave identically for every operator and so that a
-capture Job (which runs as a ServiceAccount, not as you) is never denied
-mid-run.
+No. Verified on MKE 3.9.5: with an admin client bundle, the debug shell Pods and
+the capture Jobs of both support runbooks were created and ran with only
+`system-upgrade:system-upgrade` on the allowlist. Capture Jobs are no exception
+— the pods the Job controller creates are not subject to the non-admin check
+either.
+
+Apply the grant when support work is done by non-admin MKE users. Those
+operators are refused without it even when Kubernetes RBAC already lets them
+create pods in the namespace.
 
 ### Does this need the MKE Scheduler grant too?
 
-No. Every support pod in these runbooks pins itself with `spec.nodeName`, so
-the scheduler is not involved. The pods do carry a toleration for
-`node-role.kubernetes.io/control-plane` — a `NoExecute` taint still evicts a
-pinned pod.
+No. Every support pod in these runbooks pins itself with `spec.nodeName`, so the
+scheduler is not involved, and a `NoSchedule` taint — MKE 3 taints managers with
+`com.docker.ucp.manager:NoSchedule` — cannot keep a pinned pod off its node.
+The manifests still carry a key-less `operator: Exists` toleration, which covers
+every taint including `NoExecute`, the one effect that would evict a pinned pod.
 
 ### Why not a Kubernetes PSA label or a PodSecurityPolicy?
 

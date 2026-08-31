@@ -20,9 +20,11 @@ pods when the investigation is over — nothing expires them.
 
 1. `kubectl` configured from an MKE client bundle — see
    [Access the cluster](access-cluster.md).
-2. The privilege grant and the `cluster-support` namespace from
+2. If support work is done by non-admin MKE users: the privilege grant from
    [Run privileged support containers on MKE](privileged-support-containers.md).
-   MKE's admission controller rejects these pods without it.
+   An MKE admin client bundle does not need it — verified on MKE 3.9.5 — but a
+   non-admin user is refused without it. Either way you need the
+   `cluster-support` namespace that runbook creates.
 3. `envsubst` (package `gettext`/`gettext-base`) on your workstation, for the
    multi-node path.
 4. The cluster's MKE version, for the image tag. With the client bundle's
@@ -61,7 +63,11 @@ kubectl debug node/<node-name> -it -n cluster-support \
 
 - `-n cluster-support` is required, not cosmetic: the pod runs as that
   namespace's `default` ServiceAccount, which is the identity the privilege
-  grant covers. Without it the pod lands in `default` and MKE denies it.
+  grant covers. Without it the pod lands in `default`, which is not granted.
+- kubectl prints a warning that the generated pod name is not a DNS label
+  (`must be no more than 63 characters must not contain dots`) whenever the node
+  name is an FQDN, as it is on AWS. It is noise from kubectl's own naming, not a
+  failure; the pod runs.
 - The pod is **not** deleted when you exit. Remove it explicitly:
 
   ```sh
@@ -72,31 +78,42 @@ kubectl debug node/<node-name> -it -n cluster-support \
 Upstream reference:
 [debugging a node with kubectl debug](https://kubernetes.io/docs/tasks/debug/debug-cluster/kubectl-node-debug/).
 
-If your MKE version's admission controller rejects the pod `kubectl debug`
-generates, use option 2 — the manifest is explicit about every attribute it
-requests.
+Verified on MKE 3.9.5 with an admin bundle: the generated pod reached `Running`
+and `cat /host/etc/redhat-release` inside it printed the node's Rocky Linux
+release. If your MKE version refuses the pod `kubectl debug` generates, use
+option 2 — the manifest is explicit about every attribute it requests.
 
 ### Option 2 — One or many nodes, with a manifest
 
 The template
 [`debug-shell-pod.yaml.tmpl`](../examples/cluster-support/debug-shell-pod.yaml.tmpl)
-contains a single `envsubst` variable, `${NODE_NAME}`. Edit the image tag in it
-once to match your MKE version, then fan out over any node selector:
+takes two `envsubst` variables: `${NODE_NAME}` (the node to pin to) and
+`${NODE_SLUG}` (the same name with dots replaced by dashes, used for the pod
+name — a pod name containing dots becomes the pod's hostname and kubectl warns
+about it, and AWS node names are FQDNs). Edit the image tag in the template once
+to match your MKE version, then fan out over any node selector:
 
 ```sh
 cd docs/examples/cluster-support
 
-# One node
-NODE_NAME=<node-name> envsubst < debug-shell-pod.yaml.tmpl | kubectl apply -f -
+render() {   # $1 = node name
+  NODE_NAME="$1" NODE_SLUG="$(printf '%s' "$1" | tr '.' '-')" \
+    envsubst < debug-shell-pod.yaml.tmpl
+}
 
-# Every manager node
-for node in $(kubectl get nodes -l node-role.kubernetes.io/control-plane -o jsonpath='{.items[*].metadata.name}'); do
-  NODE_NAME=$node envsubst < debug-shell-pod.yaml.tmpl | kubectl apply -f -
+# One node
+render <node-name> | kubectl apply -f -
+
+# Every manager node.
+# MKE 3 labels managers node-role.kubernetes.io/master, not
+# .../control-plane — check with: kubectl get nodes --show-labels
+for node in $(kubectl get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[*].metadata.name}'); do
+  render "$node" | kubectl apply -f -
 done
 
 # Every node
 for node in $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do
-  NODE_NAME=$node envsubst < debug-shell-pod.yaml.tmpl | kubectl apply -f -
+  render "$node" | kubectl apply -f -
 done
 ```
 
@@ -105,7 +122,7 @@ Wait for them and attach to one:
 ```sh
 kubectl -n cluster-support wait --for=condition=ready pod -l app=node-debug-shell --timeout=120s
 kubectl -n cluster-support get pods -l app=node-debug-shell -o wide
-kubectl -n cluster-support exec -it debug-shell-<node-name> -- bash
+kubectl -n cluster-support exec -it debug-shell-<node-slug> -- bash
 ```
 
 Delete all of them when finished — the pods run `sleep infinity` and persist
@@ -163,7 +180,7 @@ to your workstation without SSH:
 
 ```sh
 kubectl -n cluster-support cp \
-  debug-shell-<node-name>:/host/var/log/cluster-support/<bundle>.tar.gz \
+  debug-shell-<node-slug>:/host/var/log/cluster-support/<bundle>.tar.gz \
   ./<bundle>.tar.gz
 ```
 

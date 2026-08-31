@@ -1,7 +1,11 @@
 # Privileged debug shell Pod for one bootc-mke3 node.
 #
-# Render with envsubst, which substitutes ${NODE_NAME} and nothing else:
-#   NODE_NAME=<node> envsubst < debug-shell-pod.yaml.tmpl | kubectl apply -f -
+# Render with envsubst. Two variables: ${NODE_NAME} is the node, ${NODE_SLUG}
+# is the same name with dots replaced, because a pod name containing dots is
+# used as the pod's hostname and kubectl warns about it:
+#   node=<node>
+#   NODE_NAME=$node NODE_SLUG=$(printf '%s' "$node" | tr '.' '-') \
+#     envsubst < debug-shell-pod.yaml.tmpl | kubectl apply -f -
 #
 # Runbook: docs/operations-guide/node-debug-shell.md
 # Prerequisite: docs/operations-guide/privileged-support-containers.md
@@ -12,7 +16,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: debug-shell-${NODE_NAME}
+  name: debug-shell-${NODE_SLUG}
   namespace: cluster-support
   labels:
     app: node-debug-shell
@@ -30,10 +34,12 @@ spec:
   # hostNetwork: true
   # hostIPC: true
   tolerations:
-    # No effect specified: tolerates the control-plane taint whether it is
-    # NoSchedule or NoExecute, so the shell is not evicted from a manager.
-    - key: node-role.kubernetes.io/control-plane
-      operator: Exists
+    # Untyped, key-less toleration: tolerates every taint, which is what
+    # `kubectl debug` does for node debugging too. MKE 3 taints managers with
+    # com.docker.ucp.manager:NoSchedule, not the upstream control-plane key, and
+    # a cluster may carry others; a pinned pod bypasses the scheduler anyway, so
+    # this exists to survive NoExecute taints rather than to get scheduled.
+    - operator: Exists
   containers:
     - name: shell
       image: mirantis/ucp-dsinfo:3.9.5

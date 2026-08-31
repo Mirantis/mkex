@@ -46,12 +46,18 @@ spec:
       # needs the host PID namespace.
       hostPID: true
       tolerations:
-        # No effect specified: tolerates the control-plane taint whether it is
-        # NoSchedule or NoExecute, so a manager node is still captured.
-        - key: node-role.kubernetes.io/control-plane
-          operator: Exists
+        # Untyped, key-less toleration: tolerates every taint. MKE 3 taints
+        # managers with com.docker.ucp.manager:NoSchedule, not the upstream
+        # control-plane key. A pinned pod bypasses the scheduler anyway, so this
+        # exists to survive NoExecute taints rather than to get scheduled.
+        - operator: Exists
       containers:
         - name: collect
+          # hostPath and PVC destinations work with this image. The S3
+          # destination does NOT: its curl is 7.81, which signs sigv4 uploads
+          # incorrectly. For S3, replace image and command with:
+          #   image: alpine:3.21
+          #   command: ["sh","-c","apk add --no-cache bash util-linux tar gzip curl >/dev/null && exec bash /scripts/capture.sh"]
           image: mirantis/ucp-dsinfo:3.9.5
           command: ["bash", "/scripts/capture.sh"]
           env:
