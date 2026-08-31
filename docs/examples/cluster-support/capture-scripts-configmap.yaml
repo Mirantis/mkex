@@ -1,0 +1,270 @@
+# Collector scripts for the support-bundle capture Job.
+#
+#   kubectl apply -f capture-scripts-configmap.yaml
+#
+# Runbook: docs/operations-guide/collect-support-bundles.md
+# Prerequisite: docs/operations-guide/privileged-support-containers.md
+#
+# Mounted at /scripts by capture-job.yaml.tmpl. capture.sh is the entrypoint;
+# it runs the collectors named in $COLLECTORS and writes one tarball to every
+# destination that is mounted or configured.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: capture-scripts
+  namespace: cluster-support
+data:
+  capture.sh: |
+    #!/usr/bin/env bash
+    # capture.sh is the entrypoint of a capture Job. It runs the selected
+    # collectors into one bundle directory, tars it, and writes the tarball to
+    # every configured destination.
+    set -euo pipefail
+
+    DIR="$(cd "$(dirname "$0")" && pwd)"
+
+    export HOST="${HOST:-/host}"
+    CAPTURE_NAME="${CAPTURE_NAME:-capture}"
+    NODE_NAME="${NODE_NAME:-$(hostname)}"
+
+    # Which collectors to run, space separated. Unset runs all of them.
+    COLLECTORS="${COLLECTORS:-journal mcr mke3 bootc system}"
+    [ -n "${COLLECTORS// /}" ] || { echo "capture: COLLECTORS is empty" >&2; exit 1; }
+
+    # Passed verbatim to journalctl --since by the journal collector.
+    export JOURNAL_SINCE="${JOURNAL_SINCE:-24 hours ago}"
+
+    # Bundle naming mirrors MKE's own support bundle convention:
+    # docker-support-${HOSTNAME}-$(date +%Y%m%d-%H_%M_%S).
+    BUNDLE="${CAPTURE_NAME}-${NODE_NAME}-$(date -u +%Y%m%d-%H_%M_%S)"
+    WORK="$(mktemp -d)"
+    trap 'rm -rf "${WORK}"' EXIT
+    OUT="${WORK}/${BUNDLE}"
+    mkdir -p "${OUT}"
+    export OUT
+
+    # collectors.txt records each collector's exit status so the bundle itself
+    # says what ran and what did not.
+    for name in ${COLLECTORS}; do
+      script="${DIR}/${name}.sh"
+      if [ ! -f "${script}" ]; then
+        echo "capture: no script for collector '${name}', skipping" >&2
+        echo "${name} missing" >>"${OUT}/collectors.txt"
+        continue
+      fi
+      echo "capture: running collector '${name}'"
+      rc=0
+      bash "${script}" || rc=$?
+      echo "${name} ${rc}" >>"${OUT}/collectors.txt"
+    done
+
+    TARBALL="${WORK}/${BUNDLE}.tar.gz"
+    tar -czf "${TARBALL}" -C "${WORK}" "${BUNDLE}"
+
+    written=0
+
+    # Destinations are detected, not configured: a mounted directory or a set
+    # bucket name is the whole switch, so the Job manifest is the only place
+    # that decides where a bundle goes.
+
+    if [ -d /out ]; then
+      if cp "${TARBALL}" /out/; then
+        echo "capture: wrote /out/${BUNDLE}.tar.gz on the node"
+        written=$((written + 1))
+      else
+        echo "capture: hostPath destination write failed" >&2
+      fi
+    fi
+
+    if [ -d /pvc ]; then
+      if cp "${TARBALL}" /pvc/; then
+        echo "capture: wrote ${BUNDLE}.tar.gz to the PersistentVolumeClaim"
+        written=$((written + 1))
+      else
+        echo "capture: pvc destination write failed" >&2
+      fi
+    fi
+
+    if [ -n "${S3_BUCKET:-}" ]; then
+      # curl signs the upload itself (--aws-sigv4, curl 7.75+), so no S3 client
+      # or credential file is needed in the image. Credentials arrive as env
+      # from a Secret and never touch this ConfigMap.
+      if [ -z "${S3_ENDPOINT:-}" ]; then
+        echo "capture: S3_BUCKET set but S3_ENDPOINT is empty" >&2
+      elif ! curl --help all 2>/dev/null | grep -q -- '--aws-sigv4'; then
+        echo "capture: this image's curl lacks --aws-sigv4 (needs curl 7.75+); cannot upload to S3" >&2
+      else
+        S3_URL="${S3_ENDPOINT%/}/${S3_BUCKET}/${S3_PREFIX:-}${BUNDLE}.tar.gz"
+        # Bounded timeouts and retries: an unreachable endpoint must report a
+        # failed destination, not hold the privileged Pod on the node until the
+        # Job's activeDeadlineSeconds elapses.
+        if curl -sS --fail \
+          --connect-timeout 30 --max-time 300 --retry 3 \
+          --aws-sigv4 "aws:amz:${S3_REGION:-us-east-1},s3" \
+          --user "${AWS_ACCESS_KEY_ID:-}:${AWS_SECRET_ACCESS_KEY:-}" \
+          -T "${TARBALL}" "${S3_URL}"; then
+          echo "capture: uploaded ${BUNDLE}.tar.gz to ${S3_BUCKET}/${S3_PREFIX:-}"
+          written=$((written + 1))
+        else
+          echo "capture: s3 destination upload failed" >&2
+        fi
+      fi
+    fi
+
+    # A capture where some collectors failed is still a success — that is the
+    # point of collecting from a broken node. Only losing every destination
+    # means the capture produced nothing.
+    if [ "${written}" -eq 0 ]; then
+      echo "capture: no destination received ${BUNDLE}.tar.gz" >&2
+      exit 1
+    fi
+
+    echo "capture: ${BUNDLE}.tar.gz delivered to ${written} destination(s)"
+  common.sh: |
+    #!/usr/bin/env bash
+    # Shared helpers for every collector script. Sourced, never run as a
+    # collector: capture.sh only runs the collector names listed in $COLLECTORS.
+    set -euo pipefail
+
+    # HOST is where the node's root filesystem is mounted into the collector
+    # container. Host files are read through it.
+    HOST="${HOST:-/host}"
+
+    # OUT is the bundle directory, created and exported by capture.sh.
+    [ -n "${OUT:-}" ] || { echo "common: OUT is not set; run collectors via capture.sh" >&2; exit 1; }
+
+    # nsenter_host runs a command in the host's namespaces. Entering the host
+    # mount namespace is what makes host binaries and sockets (docker.sock,
+    # journald) resolve, so the pod needs no socket mounts of its own.
+    nsenter_host() {
+      nsenter --target 1 --mount --uts --ipc --net --pid -- "$@"
+    }
+
+    # collect runs a host command, capturing stdout to ${OUT}/<file> and stderr
+    # to ${OUT}/<file>.err. It never fails the collector: a bulk capture exists
+    # to gather what it can from a node that is already broken, so a failing
+    # command leaves evidence in a non-empty .err file and the run continues.
+    collect() {
+      local file="$1"
+      shift
+      nsenter_host "$@" >"${OUT}/${file}" 2>"${OUT}/${file}.err" || true
+      prune_err "${file}"
+    }
+
+    # copy_host copies a file from the host filesystem into the bundle,
+    # recording the failure instead of aborting when it is absent.
+    copy_host() {
+      local src="$1" file="$2"
+      cp "${HOST}${src}" "${OUT}/${file}" 2>"${OUT}/${file}.err" || true
+      prune_err "${file}"
+    }
+
+    # prune_err drops an empty .err file, so the presence of one in a bundle
+    # always means that command actually failed.
+    prune_err() {
+      [ -s "${OUT}/$1.err" ] || rm -f "${OUT}/$1.err"
+    }
+  journal.sh: |
+    #!/usr/bin/env bash
+    # journal collector: systemd journal for the current and previous boot, plus
+    # the units that matter on a bootc-MKE3 node. Rocky 9 keeps a persistent
+    # journal in /var/log/journal, so the previous boot is available after a
+    # reboot.
+    set -euo pipefail
+    DIR="$(cd "$(dirname "$0")" && pwd)"
+    # shellcheck source=common.sh
+    . "${DIR}/common.sh"
+
+    collect journal-current-boot.log journalctl --no-pager -b --since "${JOURNAL_SINCE:-24 hours ago}"
+    collect journal-previous-boot.log journalctl --no-pager -b -1
+    collect journal-errors.log journalctl --no-pager -b -p err
+    collect journal-boots.txt journalctl --no-pager --list-boots
+
+    for unit in docker.service swarm-join.service mke-images.service kubelet.service; do
+      collect "journal-unit-${unit}.log" journalctl --no-pager -u "${unit}"
+    done
+  mcr.sh: |
+    #!/usr/bin/env bash
+    # mcr collector: Mirantis Container Runtime state, its data root disk usage,
+    # its daemon configuration, and the logs of the MKE3 containers the Mirantis
+    # troubleshooting guide names as high-signal.
+    set -euo pipefail
+    DIR="$(cd "$(dirname "$0")" && pwd)"
+    # shellcheck source=common.sh
+    . "${DIR}/common.sh"
+
+    collect docker-version.txt docker version
+    collect docker-info.txt docker info
+    collect docker-ps.txt docker ps -a
+    collect docker-diskusage.txt df -P /var/lib/docker
+
+    copy_host /etc/docker/daemon.json daemon.json
+
+    for c in ucp-proxy ucp-reconcile ucp-controller ucp-auth-api ucp-auth-store; do
+      collect "docker-logs-${c}.log" docker logs "${c}"
+    done
+  mke3.sh: |
+    #!/usr/bin/env bash
+    # mke3 collector: the MKE 3 node support bundle, produced by the documented
+    # `mirantis/ucp support` command. The CLI bundle covers only the node it
+    # runs on, which is why a capture runs one Job per node.
+    set -euo pipefail
+    DIR="$(cd "$(dirname "$0")" && pwd)"
+    # shellcheck source=common.sh
+    . "${DIR}/common.sh"
+
+    MKE_VERSION="$(nsenter_host docker container inspect ucp-proxy \
+      --format '{{index .Config.Labels "com.docker.ucp.version"}}' 2>/dev/null | tr -d '[:space:]' || true)"
+
+    if [ -z "${MKE_VERSION}" ]; then
+      echo "mke3: ucp-proxy not present, not an MKE3 node; skipping" >"${OUT}/mke3-skipped.txt"
+      exit 0
+    fi
+
+    echo "${MKE_VERSION}" >"${OUT}/mke3-version.txt"
+
+    # --security-opt label=disable is required, not optional: Rocky 9 bootc
+    # enforces SELinux and the MKE documentation mandates the flag in that case.
+    # --name deliberately differs from the doc's `ucp` so a capture cannot
+    # collide with a container already running under that name.
+    nsenter_host docker container run --rm \
+      --name ucp-support-capture \
+      --security-opt label=disable \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      --log-driver none \
+      "mirantis/ucp:${MKE_VERSION}" \
+      support --timeout 20m >"${OUT}/mke3-support.tgz" 2>"${OUT}/mke3-support.err" || true
+    prune_err mke3-support
+
+    collect mke3-ping.txt curl -sk https://localhost:443/_ping
+  bootc.sh: |
+    #!/usr/bin/env bash
+    # bootc collector: which image the node is booted into and which is staged,
+    # from bootc and the underlying rpm-ostree deployment list.
+    set -euo pipefail
+    DIR="$(cd "$(dirname "$0")" && pwd)"
+    # shellcheck source=common.sh
+    . "${DIR}/common.sh"
+
+    collect bootc-status.json bootc status --format json
+    collect rpm-ostree-status.json rpm-ostree status --json
+  system.sh: |
+    #!/usr/bin/env bash
+    # system collector: general host state — kernel, failed units, disk, memory,
+    # network, and SELinux mode.
+    set -euo pipefail
+    DIR="$(cd "$(dirname "$0")" && pwd)"
+    # shellcheck source=common.sh
+    . "${DIR}/common.sh"
+
+    collect uname.txt uname -a
+    collect systemd-failed.txt systemctl list-units --failed --no-pager
+    collect df.txt df -P
+    collect free.txt free -m
+    collect ip-addr.txt ip addr
+    collect ip-route.txt ip route
+    collect dmesg.txt dmesg --ctime
+    collect sysctl-all.txt sysctl -a
+    collect selinux.txt getenforce
+
+    copy_host /etc/os-release os-release.txt

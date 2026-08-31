@@ -1,0 +1,125 @@
+# Support-bundle capture Job for one bootc-mke3 node.
+#
+# Render with envsubst, which substitutes ${NODE_NAME} and nothing else, and
+# create it (not apply — the Job uses generateName):
+#   NODE_NAME=<node> envsubst < capture-job.yaml.tmpl | kubectl create -f -
+#
+# Runbook: docs/operations-guide/collect-support-bundles.md
+# Prerequisites: docs/operations-guide/privileged-support-containers.md
+#                kubectl apply -f capture-scripts-configmap.yaml
+#
+# EDIT BEFORE USE: the image tag must match the cluster's MKE version
+# (docker version --format '{{.Server.Version}}' with the client bundle sourced
+# reports e.g. ucp/3.9.5).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # generateName, not name: a node name plus a prefix can exceed the 63-character
+  # limit that the generated job-name pod label has to satisfy.
+  generateName: capture-
+  namespace: cluster-support
+  labels:
+    app: log-capture
+  annotations:
+    # The captured node, for mapping Jobs back to nodes without -o wide.
+    support.mirantis.com/node: ${NODE_NAME}
+spec:
+  # One attempt: a failed capture must surface as a failed Job rather than
+  # loop, and the collectors already tolerate a broken host.
+  backoffLimit: 0
+  # Finished capture Jobs are reaped an hour after completion.
+  ttlSecondsAfterFinished: 3600
+  # Bounds a single node's capture, leaving room for the mke3 collector's
+  # 20-minute support-bundle timeout.
+  activeDeadlineSeconds: 2400
+  template:
+    metadata:
+      labels:
+        app: log-capture
+    spec:
+      # Pinned to the node, which bypasses the scheduler: the capture reaches
+      # nodes the scheduler would refuse, and needs no MKE scheduling grant.
+      nodeName: ${NODE_NAME}
+      restartPolicy: Never
+      serviceAccountName: default
+      # nsenter --target 1, which every collector uses to reach host tooling,
+      # needs the host PID namespace.
+      hostPID: true
+      tolerations:
+        # No effect specified: tolerates the control-plane taint whether it is
+        # NoSchedule or NoExecute, so a manager node is still captured.
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      containers:
+        - name: collect
+          image: mirantis/ucp-dsinfo:3.9.5
+          command: ["bash", "/scripts/capture.sh"]
+          env:
+            - name: NODE_NAME
+              value: ${NODE_NAME}
+            # Bundle name prefix: <CAPTURE_NAME>-<node>-<UTC timestamp>.tar.gz
+            - name: CAPTURE_NAME
+              value: capture
+            - name: HOST
+              value: /host
+            # Collectors to run, space separated. Unset runs all five.
+            # - name: COLLECTORS
+            #   value: "journal mcr bootc system"
+            # Passed verbatim to journalctl --since. Default "24 hours ago".
+            # - name: JOURNAL_SINCE
+            #   value: "48 hours ago"
+            #
+            # --- S3 destination (optional) ---
+            # Uncomment all six. S3_BUCKET being set is what enables the
+            # upload; credentials come from the Secret created from
+            # s3-credentials-secret.yaml.example.
+            # - name: S3_ENDPOINT
+            #   value: "https://s3.us-east-2.amazonaws.com"
+            # - name: S3_BUCKET
+            #   value: "my-support-bundles"
+            # - name: S3_PREFIX
+            #   value: "cluster-a/"
+            # - name: S3_REGION
+            #   value: "us-east-2"
+            # - name: AWS_ACCESS_KEY_ID
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: s3-credentials
+            #       key: accessKeyID
+            # - name: AWS_SECRET_ACCESS_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: s3-credentials
+            #       key: secretAccessKey
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+            - name: scripts
+              mountPath: /scripts
+            # hostPath destination: mounting /out is what enables it.
+            - name: host-out
+              mountPath: /out
+            # --- PVC destination (optional) ---
+            # Mounting /pvc is what enables it; uncomment here and below.
+            # - name: bundles
+            #   mountPath: /pvc
+      volumes:
+        - name: host-root
+          hostPath:
+            path: /
+        - name: scripts
+          configMap:
+            name: capture-scripts
+            # Octal: the collectors are executed, not sourced by a shell.
+            defaultMode: 0755
+        - name: host-out
+          hostPath:
+            path: /var/log/cluster-support
+            type: DirectoryOrCreate
+        # - name: bundles
+        #   persistentVolumeClaim:
+        #     # Must already exist, and must be ReadWriteMany when capturing
+        #     # more than one node at a time.
+        #     claimName: support-bundles
