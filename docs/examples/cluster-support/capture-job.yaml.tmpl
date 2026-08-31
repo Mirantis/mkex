@@ -22,7 +22,7 @@ metadata:
     app: log-capture
   annotations:
     # The captured node, for mapping Jobs back to nodes without -o wide.
-    support.mirantis.com/node: ${NODE_NAME}
+    support.mirantis.com/node: "${NODE_NAME}"
 spec:
   # One attempt: a failed capture must surface as a failed Job rather than
   # loop, and the collectors already tolerate a broken host.
@@ -39,7 +39,7 @@ spec:
     spec:
       # Pinned to the node, which bypasses the scheduler: the capture reaches
       # nodes the scheduler would refuse, and needs no MKE scheduling grant.
-      nodeName: ${NODE_NAME}
+      nodeName: "${NODE_NAME}"
       restartPolicy: Never
       serviceAccountName: default
       # nsenter --target 1, which every collector uses to reach host tooling,
@@ -62,7 +62,7 @@ spec:
           command: ["bash", "/scripts/capture.sh"]
           env:
             - name: NODE_NAME
-              value: ${NODE_NAME}
+              value: "${NODE_NAME}"
             # Bundle name prefix: <CAPTURE_NAME>-<node>-<UTC timestamp>.tar.gz
             - name: CAPTURE_NAME
               value: capture

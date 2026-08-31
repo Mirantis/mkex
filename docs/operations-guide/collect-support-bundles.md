@@ -44,6 +44,7 @@ All three live in [`docs/examples/cluster-support/`](../examples/cluster-support
 | [`capture-scripts-configmap.yaml`](../examples/cluster-support/capture-scripts-configmap.yaml) | The collector scripts, mounted at `/scripts`. Applied once per cluster. |
 | [`capture-job.yaml.tmpl`](../examples/cluster-support/capture-job.yaml.tmpl) | One Job per node. `${NODE_NAME}` is its only template variable. |
 | [`s3-credentials-secret.yaml.example`](../examples/cluster-support/s3-credentials-secret.yaml.example) | Credentials skeleton, only for the S3 destination. |
+| [`pvc-hostpath-dev-test.yaml`](../examples/cluster-support/pvc-hostpath-dev-test.yaml) | Dev/test node-local claim, only for exercising the PVC destination. |
 
 ## Procedure
 
@@ -122,8 +123,9 @@ kubectl -n cluster-support cp \
 kubectl -n cluster-support delete pod debug-shell-$slug
 ```
 
-Use the PVC or S3 destination instead when you want every node's bundle to
-arrive in one place without this step.
+The S3 destination avoids this step entirely. The PVC destination only does so
+if the claim is backed by genuinely shared storage — see
+[PVC](#pvc).
 
 ### 5. Clean up
 
@@ -171,7 +173,7 @@ enabled destination receives the same tarball.
 | Destination | Enabled by | Behaviour |
 |---|---|---|
 | hostPath | `/out` mounted (default: `hostPath: /var/log/cluster-support`, `DirectoryOrCreate`) | Writes the bundle onto the node itself. Retrieve it with a debug shell, as in step 4. |
-| PVC | `/pvc` mounted | Copies the bundle into an existing claim, so all nodes' bundles land together. |
+| PVC | `/pvc` mounted | Copies the bundle into an existing claim. Whether that collects bundles from several nodes into one place depends entirely on the storage backing the claim — see below. |
 | S3 | `S3_BUCKET` set | Uploads to an S3-compatible endpoint. |
 
 ### PVC
@@ -182,13 +184,48 @@ creates or deletes claims. A default `bootc-mke3` cluster ships **no**
 StorageClass (`kubectl get storageclass` is empty), so this destination requires
 storage you have provisioned yourself.
 
-The claim **must be `ReadWriteMany`** when capturing more than one node at a
-time: one Pod per node mounts it concurrently. With `ReadWriteOnce`, Pods on
-every other node stay `Pending` until `activeDeadlineSeconds` (2400s) expires
-and their Jobs fail. For a `ReadWriteOnce` claim, capture one node at a time.
+[`pvc-hostpath-dev-test.yaml`](../examples/cluster-support/pvc-hostpath-dev-test.yaml)
+is a two-object, node-local claim for exercising this destination on a cluster
+with no storage. It is labelled dev/test because it is not a shared destination
+— read the next paragraph before using it for anything real.
 
-> Unlike the hostPath and S3 destinations, this one is not covered by the
-> verification behind this runbook — the test cluster had no StorageClass.
+> [!IMPORTANT]
+> **Only genuinely shared storage collects bundles into one place, and access
+> modes will not tell you whether yours is.** Access modes are metadata, not
+> enforcement: for a node-local volume (`hostPath`, `local`) nothing enforces
+> them, because such volumes have no attach step and these pods bypass the
+> scheduler by setting `spec.nodeName`.
+>
+> Measured on MKE 3.9.5, one claim, three nodes captured concurrently:
+>
+> | Claim declares | Result |
+> |---|---|
+> | `ReadWriteMany`, backed by `hostPath` | All three Jobs `Complete`, no error — and each node's `/pvc` holds **only its own bundle**. Three separate directories, silently. |
+> | `ReadWriteOnce`, backed by `hostPath` | Also all three `Complete`. No `Pending`, no multi-attach error: `ReadWriteOnce` blocked nothing. |
+>
+> So declaring `ReadWriteMany` on node-local storage buys nothing but a false
+> impression. Use storage that is really shared (NFS, CephFS, EFS-class) if you
+> want one collection point; otherwise prefer the hostPath destination, which is
+> at least honest about being per-node, and retrieve with a debug shell.
+>
+> On **attachable** storage (CSI block volumes such as EBS) a `ReadWriteOnce`
+> volume genuinely cannot attach to more than one node, so pods on the other
+> nodes would fail to mount and their Jobs would fail at
+> `activeDeadlineSeconds`. That path is reasoned, not tested — a default cluster
+> has no CSI driver to test it with.
+
+> [!WARNING]
+> **Do not back this claim with a StorageClass that uses
+> `volumeBindingMode: WaitForFirstConsumer`.** That mode defers binding until
+> the scheduler places a consuming pod, and these pods are never scheduled —
+> they set `spec.nodeName`. Verified: the claim stays `Pending` indefinitely even
+> with a consuming pod, and the pod sits `Pending` with
+> `FailedMount ... PVC is not bound`. Bind the claim statically (name its
+> `volumeName`, set `storageClassName: ""`) or use an `Immediate`-binding class.
+
+Verified working on MKE 3.9.5: with a statically bound claim, a capture logs
+`wrote <bundle>.tar.gz to the PersistentVolumeClaim` and reports
+`delivered to 2 destination(s)` alongside the default hostPath destination.
 
 ### S3
 

@@ -23,7 +23,7 @@ metadata:
 spec:
   # Pinned to the node, which bypasses the scheduler: the shell reaches nodes
   # the scheduler would refuse, and needs no MKE scheduling grant.
-  nodeName: ${NODE_NAME}
+  nodeName: "${NODE_NAME}"
   restartPolicy: Never
   serviceAccountName: default
   # nsenter --target 1 needs the host PID namespace; it also gives the
