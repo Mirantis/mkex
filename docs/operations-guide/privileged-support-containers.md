@@ -164,6 +164,13 @@ kubectl -n cluster-support delete pod grant-check
 Creation succeeding — rather than being refused with the error above — proves the
 grant. The pod runs `true` and exits.
 
+## Expected Results
+
+- The `grant-check` pod in step 3 is created instead of denied.
+- The support pods in [node-debug-shell.md](node-debug-shell.md) and
+  [collect-support-bundles.md](collect-support-bundles.md) start on their
+  target nodes.
+
 ## Automated alternative
 
 This repository already automates the same two API calls for the System Upgrade
@@ -205,13 +212,6 @@ kubectl delete namespace cluster-support
 Leaving `priv_attributes_allowed_for_service_accounts` populated is harmless on
 its own — it lists what *may* be granted; without an entry in
 `priv_attributes_service_accounts` no ServiceAccount can use it.
-
-## Expected Results
-
-- The `grant-check` pod in step 3 is created instead of denied.
-- The support pods in [node-debug-shell.md](node-debug-shell.md) and
-  [collect-support-bundles.md](collect-support-bundles.md) start on their
-  target nodes.
 
 ## F.A.Q
 

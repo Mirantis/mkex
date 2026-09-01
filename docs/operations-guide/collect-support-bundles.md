@@ -138,6 +138,16 @@ Finished Jobs also delete themselves an hour after completion
 `/var/log/cluster-support` are **not** cleaned up — delete them from the debug
 shell once collected.
 
+## Expected Results
+
+- One Job per targeted node, each reaching `Complete`:
+  `kubectl -n cluster-support get jobs -l app=log-capture`.
+- On each node, `/var/log/cluster-support/<name>-<node>-<timestamp>.tar.gz`
+  exists (visible from a [debug shell](node-debug-shell.md) at
+  `/host/var/log/cluster-support/`).
+- Inside a bundle: `collectors.txt` listing each collector with exit code `0`,
+  and — on an MKE node — a non-empty `mke3-support.tgz`.
+
 ## What is collected
 
 Every collector writes its command output into the bundle, one file per
@@ -190,42 +200,43 @@ with no storage. It is labelled dev/test because it is not a shared destination
 — read the next paragraph before using it for anything real.
 
 > [!IMPORTANT]
-> **Only genuinely shared storage collects bundles into one place, and access
-> modes will not tell you whether yours is.** Access modes are metadata, not
-> enforcement: for a node-local volume (`hostPath`, `local`) nothing enforces
-> them, because such volumes have no attach step and these pods bypass the
-> scheduler by setting `spec.nodeName`.
->
-> Measured on MKE 3.9.5, one claim, three nodes captured concurrently:
->
-> | Claim declares | Result |
-> |---|---|
-> | `ReadWriteMany`, backed by `hostPath` | All three Jobs `Complete`, no error — and each node's `/pvc` holds **only its own bundle**. Three separate directories, silently. |
-> | `ReadWriteOnce`, backed by `hostPath` | Also all three `Complete`. No `Pending`, no multi-attach error: `ReadWriteOnce` blocked nothing. |
->
-> So declaring `ReadWriteMany` on node-local storage buys nothing but a false
-> impression. For one collection point, back the claim with storage that is
-> really shared — NFS, CephFS, an EFS-class service, or any CSI driver offering
-> a true `ReadWriteMany` volume. With such storage this destination does exactly
-> what it promises: measured on MKE 3.9.5 with a `ReadWriteMany` claim, three
-> nodes captured concurrently and all three bundles landed side by side in the
-> one claim. Otherwise prefer the hostPath destination, which is at least honest
-> about being per-node, and retrieve with a debug shell.
->
-> On **attachable** storage (CSI block volumes such as EBS) a `ReadWriteOnce`
-> volume genuinely cannot attach to more than one node, so pods on the other
-> nodes would fail to mount and their Jobs would fail at
-> `activeDeadlineSeconds`. That path is reasoned, not tested — a default cluster
-> has no CSI driver to test it with.
+> Only genuinely shared storage collects bundles into one place, and the claim's
+> access mode will not tell you whether yours does.
+
+Access modes are metadata, not enforcement. For a node-local volume (`hostPath`,
+`local`) nothing enforces them: such volumes have no attach step, and these pods
+bypass the scheduler by setting `spec.nodeName`. Measured on MKE 3.9.5, one
+claim, three nodes captured concurrently:
+
+| Claim declares | Result |
+|---|---|
+| `ReadWriteMany`, backed by `hostPath` | All three Jobs `Complete`, no error — and each node's `/pvc` holds **only its own bundle**. Three separate directories, silently. |
+| `ReadWriteOnce`, backed by `hostPath` | Also all three `Complete`. No `Pending`, no multi-attach error: `ReadWriteOnce` blocked nothing. |
+
+So declaring `ReadWriteMany` on node-local storage buys nothing but a false
+impression. For one collection point, back the claim with storage that is really
+shared — NFS, CephFS, an EFS-class service, or any CSI driver offering a true
+`ReadWriteMany` volume. With such storage this destination does exactly what it
+promises: measured with a `ReadWriteMany` claim, three nodes captured
+concurrently and all three bundles landed side by side in the one claim.
+Otherwise prefer the hostPath destination, which is at least honest about being
+per-node, and retrieve with a debug shell.
+
+On **attachable** storage (CSI block volumes such as EBS) a `ReadWriteOnce`
+volume genuinely cannot attach to more than one node, so pods on the other nodes
+would fail to mount and their Jobs would fail at `activeDeadlineSeconds`. That
+path is reasoned, not tested — a default cluster has no CSI driver to test it
+with.
 
 > [!WARNING]
-> **Do not back this claim with a StorageClass that uses
-> `volumeBindingMode: WaitForFirstConsumer`.** That mode defers binding until
-> the scheduler places a consuming pod, and these pods are never scheduled —
-> they set `spec.nodeName`. Verified: the claim stays `Pending` indefinitely even
-> with a consuming pod, and the pod sits `Pending` with
-> `FailedMount ... PVC is not bound`. Bind the claim statically (name its
-> `volumeName`, set `storageClassName: ""`) or use an `Immediate`-binding class.
+> Do not back this claim with a StorageClass that uses
+> `volumeBindingMode: WaitForFirstConsumer`.
+
+That mode defers binding until the scheduler places a consuming pod, and these
+pods are never scheduled — they set `spec.nodeName`. Verified: the claim stays
+`Pending` indefinitely even with a consuming pod, and the pod sits `Pending` with
+`FailedMount ... PVC is not bound`. Bind the claim statically (name its
+`volumeName`, set `storageClassName: ""`) or use an `Immediate`-binding class.
 
 Verified working on MKE 3.9.5: with a statically bound claim, a capture logs
 `wrote <bundle>.tar.gz to the PersistentVolumeClaim` and reports
@@ -284,26 +295,28 @@ folder. `S3_REGION` defaults to `us-east-1` when unset, which matters because it
 is part of the request signature.
 
 > [!IMPORTANT]
-> **The S3 destination needs a collector image with curl 8 or newer, which
-> `mirantis/ucp-dsinfo` is not.** That image (Ubuntu 22.04) ships curl 7.81.0,
-> which advertises `--aws-sigv4` but computes an upload signature the server
-> rejects: verified against an S3-compatible endpoint, curl 7.81.0 returns
-> `SignatureDoesNotMatch` while curl 8.14.1 and 8.15.0 accept the identical
-> request, credentials, region, and URL. `capture.sh` checks the version and
-> logs `signs sigv4 uploads incorrectly` rather than producing a silent 403.
->
-> For the S3 destination, swap the collector container's image and command:
->
-> ```yaml
->           image: alpine:3.21
->           command: ["sh","-c","apk add --no-cache bash util-linux tar gzip curl >/dev/null && exec bash /scripts/capture.sh"]
-> ```
->
-> This is verified working end to end (curl 8.14.1). The collectors themselves
-> are unaffected by the image: every host command runs through
-> `nsenter --target 1` against the node's own binaries, so the container only
-> needs `bash`, `nsenter`, `tar`, `gzip`, and `curl`. In an air-gapped cluster,
-> mirror an image that already contains those rather than relying on `apk`.
+> The S3 destination needs a collector image with curl 8 or newer, which
+> `mirantis/ucp-dsinfo` is not.
+
+That image (Ubuntu 22.04) ships curl 7.81.0, which advertises `--aws-sigv4` but
+computes an upload signature the server rejects. Verified against an
+S3-compatible endpoint: curl 7.81.0 returns `SignatureDoesNotMatch` while curl
+8.14.1 and 8.15.0 accept the identical request, credentials, region, and URL.
+`capture.sh` checks the version and logs `signs sigv4 uploads incorrectly`
+rather than producing a silent 403.
+
+For the S3 destination, swap the collector container's image and command:
+
+```yaml
+          image: alpine:3.21
+          command: ["sh","-c","apk add --no-cache bash util-linux tar gzip curl >/dev/null && exec bash /scripts/capture.sh"]
+```
+
+This is verified working end to end (curl 8.14.1). The collectors themselves are
+unaffected by the image: every host command runs through `nsenter --target 1`
+against the node's own binaries, so the container only needs `bash`, `nsenter`,
+`tar`, `gzip`, and `curl`. In an air-gapped cluster, mirror an image that
+already contains those rather than relying on `apk`.
 
 Uploads are bounded (`--connect-timeout 30 --max-time 300 --retry 3`) so an
 unreachable endpoint fails the destination instead of holding a privileged Pod on
@@ -353,16 +366,6 @@ done
 kubectl -n cluster-support wait --for=condition=complete job -l app=log-capture --timeout=45m
 # retrieve, delete the Jobs, then repeat with batch-ab
 ```
-
-## Expected Results
-
-- One Job per targeted node, each reaching `Complete`:
-  `kubectl -n cluster-support get jobs -l app=log-capture`.
-- On each node, `/var/log/cluster-support/<name>-<node>-<timestamp>.tar.gz`
-  exists (visible from a [debug shell](node-debug-shell.md) at
-  `/host/var/log/cluster-support/`).
-- Inside a bundle: `collectors.txt` listing each collector with exit code `0`,
-  and — on an MKE node — a non-empty `mke3-support.tgz`.
 
 ## F.A.Q
 

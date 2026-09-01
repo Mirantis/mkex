@@ -132,6 +132,16 @@ until removed:
 kubectl -n cluster-support delete pod -l app=node-debug-shell
 ```
 
+## Expected Results
+
+- `kubectl -n cluster-support get pods -l app=node-debug-shell -o wide` shows
+  one `Running` pod per targeted node, each on its own node.
+- `kubectl -n cluster-support exec -it debug-shell-<node> -- cat /host/etc/os-release`
+  prints the node's Rocky Linux release — proof the mount is the real host
+  filesystem, not the container image's.
+- `nsenter --target 1 --mount --uts --ipc --net --pid -- docker ps` lists the
+  node's MKE containers.
+
 ## Using the shell
 
 Inside the container, three levels of host access are available.
@@ -183,16 +193,6 @@ kubectl -n cluster-support cp \
   debug-shell-<node-slug>:/host/var/log/cluster-support/<bundle>.tar.gz \
   ./<bundle>.tar.gz
 ```
-
-## Expected Results
-
-- `kubectl -n cluster-support get pods -l app=node-debug-shell -o wide` shows
-  one `Running` pod per targeted node, each on its own node.
-- `kubectl -n cluster-support exec -it debug-shell-<node> -- cat /host/etc/os-release`
-  prints the node's Rocky Linux release — proof the mount is the real host
-  filesystem, not the container image's.
-- `nsenter --target 1 --mount --uts --ipc --net --pid -- docker ps` lists the
-  node's MKE containers.
 
 ## F.A.Q
 
