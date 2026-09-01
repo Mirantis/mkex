@@ -68,6 +68,12 @@ MCR upgrade is implemented using ansible tooling which applies new bootc deploym
 
 ## Upgrade rollback
 
+> [!NOTE]
+> This section covers the **OS/MCR-only** manual rollback. It does not
+> restore MKE. For the combined OS+MCR+MKE rollback via the canonical
+> `ClusterUpgrade` CR path, see
+> [Roll back a bootc-mke3 upgrade](rollback-bootc-mke3.md) instead.
+
 In case of MCR upgrade failure, there is a way to perform a rollback to a previous deployment (= previous version of MCR and OS packages).
 
 ### Procedure

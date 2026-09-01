@@ -19,6 +19,7 @@ Day-2 operations for a running `bootc-mke3` MKE 3 cluster: accessing it, growing
 
 - [Upgrade bootc-mke3 (via the `ClusterUpgrade` CR)](operations-guide/upgrade-with-controller.md) — the canonical, controller-driven upgrade path.
 - [Upgrade bootc-mke3 via Ansible](operations-guide/upgrade-with-ansible.md) — manual exception path for when the controller is unavailable or disabled.
+- [Roll back a bootc-mke3 upgrade](operations-guide/rollback-bootc-mke3.md) — revert a failed `ClusterUpgrade`'s OS+MCR+MKE changes via `spec.rollback.requested`.
 
 ## Security
 
