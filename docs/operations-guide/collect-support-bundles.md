@@ -231,62 +231,40 @@ Verified working on MKE 3.9.5: with a statically bound claim, a capture logs
 `wrote <bundle>.tar.gz to the PersistentVolumeClaim` and reports
 `delivered to 2 destination(s)` alongside the default hostPath destination.
 
-#### If you choose NFS, preload the client modules first
+#### How this was tested, and the one bootc-specific trap
 
-NFS is one shared-storage option among several, and nothing here requires it.
-It is documented because it is the cheapest to stand up on a cluster with no
-storage, and because on `bootc-mke3` it needs one node-level step that is easy
-to mistake for a broken claim. Other backends have their own prerequisites —
-typically a CSI driver — and are unaffected by this section.
+The shared-storage result above was produced with an in-cluster NFS server,
+chosen only because it is the cheapest way to get a real `ReadWriteMany` volume
+onto a cluster that ships no storage. **NFS is not part of the expected
+deployment** — an operator using this destination is expected to point it at
+whatever storage the cluster already has. It is recorded here because the setup
+surfaced one fact about `bootc-mke3` nodes that applies to any NFS-backed claim.
 
-An NFS claim cannot mount on a stock `bootc-mke3` node, even though the image
-ships `nfs-utils`, `mount.nfs`, `rpcbind`, and the modules on disk. The image
-sets `kernel.modules_disabled=1`, and only `sunrpc` is loaded at boot, so the
-NFS modules can never be loaded on demand. The mount fails with an error that
-names which module is missing:
+A stock node cannot mount NFS at all, despite the image shipping `nfs-utils`,
+`mount.nfs`, `rpcbind`, and the modules on disk: it sets
+`kernel.modules_disabled=1` and boots with only `sunrpc` loaded, so the NFS
+modules can never be loaded on demand. The mount error names what is missing:
 
-| Modules preloaded | `mount.nfs` says |
+| Modules loaded at boot | `mount.nfs` says |
 |---|---|
 | none (stock node) | `No such device` |
 | `nfs` only | `Protocol not supported` — the version modules are separate |
 | `nfs nfsv4 nfsv3 lockd nfs_acl` | mounts |
 
-Preload them with `machine-config-controller`, which writes a
-`/etc/modules-load.d` drop-in that `systemd-modules-load.service` applies
-*before* the lockdown sysctl — see
-[machine configuration changes](machine-config-operations.md):
+The remedy is the ordinary one and the lockdown does not prevent it: list the
+modules in a `/etc/modules-load.d/*.conf` file and reboot, since
+`systemd-modules-load.service` is ordered `Before=systemd-sysctl.service` and so
+runs while loading is still permitted. The trap is the middle row — preloading
+`nfs` alone looks sufficient and is not. Across a cluster, have
+`machine-config-controller` maintain that drop-in (`spec.kernel.modules.load`,
+then a separate `reboot` resource) rather than editing nodes by hand; see
+[machine configuration changes](machine-config-operations.md).
 
-```yaml
-apiVersion: config.machine-config-controller.io/v1alpha1
-kind: MachineConfigChange
-metadata:
-  name: mcc-nfs-modules
-spec:
-  kernel:
-    modules:
-      load: ["nfs", "nfsv4", "nfsv3", "lockd", "nfs_acl"]
-  rollout:
-    concurrency: 1
-```
-
-The drop-in only takes effect on the next boot, so follow it with a **separate**
-`reboot` resource (never combined with another module, `concurrency: 1`) as that
-runbook requires, and delete the reboot resource once the rollout completes.
-
-Verified end to end on MKE 3.9.5, three managers: the `kernel.modules` change
-reported `Reconciled` even though the immediate `modprobe` cannot succeed under
-`modules_disabled=1` — the persisted drop-in is what matters — the structured
-reboot rolled all three nodes in 220s, and after it every node had
-`nfs nfsv3 nfsv4 lockd nfs_acl` loaded with `kernel.modules_disabled` still `1`.
-
-Two further notes if you use an in-cluster NFS server for this:
-
-- A **userspace** server (nfs-ganesha) needs no kernel module of its own and
-  runs fine on a stock node; only the client side needs the preload above. A
-  kernel-mode NFS server would additionally need `nfsd`, which is subject to the
-  same lockdown.
-- kubelet mounts NFS in the **host** network namespace, where cluster DNS does
-  not resolve. Point the PV at the Service's ClusterIP, not its DNS name.
+Two smaller observations from the same setup, for anyone reproducing it: a
+userspace NFS server (nfs-ganesha) needs no kernel module of its own and runs on
+a stock node — only the client side needs the preload — and kubelet mounts NFS in
+the host network namespace, where cluster DNS does not resolve, so the PV must
+name the Service's ClusterIP rather than its DNS name.
 
 ### S3
 
