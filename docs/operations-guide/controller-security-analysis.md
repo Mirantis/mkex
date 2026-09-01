@@ -12,7 +12,7 @@ This document analyzes the security posture of the two Kubernetes controllers `b
 Since the controllers are no longer vendored into this repository, re-verifying any claim below requires cloning the two upstream repositories at (or near) the pinned commits above — `cluster-upgrade-controller` @ `8d37c8d` and `machine-config-controller` @ `6b2b670` — and re-checking the cited files and line ranges directly against those checkouts.
 
 > [!IMPORTANT]
-> Both controllers depend on [Rancher's System Upgrade Controller (SUC)](https://github.com/rancher/system-upgrade-controller), which is *not* vendored here and is out of scope for source review, but its trust model is central to both controllers' security and is analyzed below based on how it is invoked and configured (`ansible/tasks/suc-priv-grant-tasks.yml`, `ansible/tasks/mke-upgrade-controller-tasks.yml`).
+> Both controllers depend on [Rancher's System Upgrade Controller (SUC)](https://github.com/rancher/system-upgrade-controller), which is *not* vendored here and is out of scope for source review, but its trust model is central to both controllers' security and is analyzed below based on how it is invoked and configured (`ansible/tasks/suc-priv-grant-tasks.yml`, `ansible/tasks/cluster-upgrade-controller-tasks.yml`).
 
 ## 1. Shared architecture and trust model
 
@@ -173,12 +173,12 @@ Ordered by leverage (highest-impact / lowest-effort first):
 8. **Define and test a rollback procedure** for `MachineConfigChange` beyond the `.mcc-orig` backup — e.g. a documented "revert CR" pattern — before relying on it in production (R8).
 9. **Pin and scan the agent image** (`Dockerfile.agent`) in the same CI/image-scanning pipeline as the controller image; do not treat it as lower-risk because it "just runs scripts" (R9).
 10. **Enable Kubernetes audit logging** for `create`/`update`/`delete` on both CRDs, `plans`, and `secrets` in `system-upgrade`, so any use of the escalation paths above is attributable.
-11. **Set `zap.Options{Development: false}`** (or the chart equivalent) for both controllers in production to avoid verbose stack traces in logs.
+11. **Set `zap.Options{Development: false}`** (or the equivalent flag/env override in the deployed manifest) for both controllers in production to avoid verbose stack traces in logs.
 
 ## 7. References
 
 - [`docs/architecture.md`](https://github.com/Mirantis/cluster-upgrade-controller/blob/8d37c8d/docs/architecture.md), [`docs/reference.md`](https://github.com/Mirantis/cluster-upgrade-controller/blob/8d37c8d/docs/reference.md)
 - [`docs/architecture.md`](https://github.com/Mirantis/machine-config-controller/blob/6b2b670/docs/architecture.md), [`docs/reference.md`](https://github.com/Mirantis/machine-config-controller/blob/6b2b670/docs/reference.md), [`README.md#security-model`](https://github.com/Mirantis/machine-config-controller/blob/6b2b670/README.md#security-model)
 - [Rancher System Upgrade Controller](https://github.com/rancher/system-upgrade-controller)
-- `ansible/tasks/suc-priv-grant-tasks.yml`, `ansible/tasks/mke-upgrade-controller-tasks.yml`
+- `ansible/tasks/suc-priv-grant-tasks.yml`, `ansible/tasks/cluster-upgrade-controller-tasks.yml`
 - Companion runbook: [Harden MKE3 / Kubernetes](harden-mke3-kubernetes.md)

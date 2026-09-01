@@ -21,7 +21,7 @@ version; this runbook only covers using it once it's confirmed healthy.
    kubectl get crd <the name above> -o yaml
    ```
 
-   The chart baked into a given image build (and therefore its CRD's exact
+   The manifest baked into a given image build (and therefore its CRD's exact
    `apiVersion` and `status` field names) can differ across builds — always
    confirm against the live CRD before writing a `MachineConfigChange`.
    Baked sample manifests for reference are also on any cluster node under
@@ -111,6 +111,6 @@ the cluster afterwards (see the upstream runbook's reconvergence section).
 
 | Symptom | Likely cause | Remediation |
 |---|---|---|
-| `kubectl apply` fails `strict decoding error: unknown field "spec.reboot"` (or any other module) | The controller's CRD is stale relative to its chart | See the [controllers runbook](../installation-guide/install-controllers.md#machine-config-controllers-chart-is-the-exception--it-registry-pulls-by-default) for `kubectl apply -f <chart>/crds/*.yaml` |
+| `kubectl apply` fails `strict decoding error: unknown field "spec.reboot"` (or any other module) | The cluster's CRD is older than the CR you're submitting — a stale or overridden controller manifest | See the [controllers runbook troubleshooting](../installation-guide/install-controllers.md#troubleshooting) — re-apply a manifest whose CRD matches, or drop the `machine_config_controller_manifest` override to fall back to the node-fetched default |
 | `Applied=False/Applying` stuck for a long time | A targeted node isn't converging (reboot never returned, drain stuck) | See the upstream [structured reboot runbook](https://github.com/Mirantis/machine-config-controller/blob/main/docs/structured-reboot.md#stuck-node-diagnosis-and-recovery) — the same Plan/job inspection it describes applies to non-reboot modules too |
 | A `mcc-reboot` resource is still applied well after its rollout finished | Not deleted post-rollout | Delete it — a lingering reboot resource re-triggers once on any node that later joins the cluster |

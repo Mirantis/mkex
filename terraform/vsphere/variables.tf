@@ -107,7 +107,7 @@ variable "nameserver" {
 
 variable "cluster_name" {
   description = "Name of the cluster (will be used as prefix for cluster nodes)"
-  default     = "mkex-cluster"
+  default     = "mke-cluster"
 }
 
 variable "docker_hub_username" {

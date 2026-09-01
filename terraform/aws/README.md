@@ -1,6 +1,6 @@
 # Provision `bootc-mke3` on AWS with Terraform
 
-Calls the [`terraform-mirantis-provision-aws` `mke3` example](https://registry.terraform.io/modules/terraform-mirantis-modules/provision-aws/mirantis/latest/examples/mke3) directly as a module (pinned to `v0.1.7`) to provision EC2 nodes for `bootc-mke3` and produce an ansible inventory.
+Calls the [`terraform-mirantis-provision-aws` `mke3` example](https://registry.terraform.io/modules/terraform-mirantis-modules/provision-aws/mirantis/latest/examples/mke3) directly as a module (pinned to `0.1.7`) to provision EC2 nodes for `bootc-mke3` and produce an ansible inventory.
 
 > [!IMPORTANT]
 > AWS-based provisioning is considered **dev/testing only**, not a production-grade path. Because of that, the `bootc-mke3` AMI is not published anywhere automated. Contact your Mirantis representative to obtain a current AMI ID and its owning AWS account. See also [docs/installation-guide/provisioning.md](../../docs/installation-guide/provisioning.md) and the [AWS provisioning runbook](../../docs/installation-guide/provision-terraform-aws.md).
@@ -36,9 +36,9 @@ This folder is intentionally thin — `main.tf` calls the upstream `mke3` exampl
 | `aws.region` | AWS region | `us-east-1` |
 | `network` | VPC CIDR and gateway flags | `172.31.0.0/16`, no NAT/VPN |
 | `subnets` | Subnet CIDR blocks mapped to node groups | `{}` |
-| `nodegroups` | EC2 node group definitions (`ami_id`/`ami_owner` for bootc, type, count, role). Each entry also accepts a `user_data` field, but it is silently ignored whenever `is_bootc_based = true` — see below | — |
+| `nodegroups` | EC2 node group definitions: `ami_id`+`ami_owner` for bootc (with `ssh_user` required alongside `ami_id`), `type`, `count`, `volume_size`, `role`, `public`. Each entry also accepts a `user_data` field, but it is silently ignored whenever `is_bootc_based = true` — see below | — |
 | `is_bootc_based` | Inject the `cloud-user` cloud-init payload, overriding any per-nodegroup `user_data` | `true` |
-| `ssh_pk_location` | Directory to write the generated SSH private key | `./ssh-keys/` |
+| `ssh_pk_location` | Directory to write the generated SSH private key; empty means the upstream module's default location | `""` |
 | `extra_tags` | Additional AWS tags applied to all resources | `{}` |
 
 ## Outputs
