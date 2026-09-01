@@ -10,6 +10,8 @@ Day-2 operations for a running `bootc-mke3` MKE 3 cluster: accessing it, growing
 
 - [No-touch cluster join](operations-guide/no-touch-join.md) — how the built-in first-boot join mechanism works.
 - [Join machines with no-touch join](operations-guide/join-machines-no-touch.md) — step-by-step procedure for adding worker machines.
+- [Promote and demote machines](operations-guide/promote-demote-machine.md) — change a machine between manager and worker; quorum rules.
+- [Expel a machine from the cluster](operations-guide/expel-machine.md) — cordon at both layers, drain, and remove a machine; forced expel of an unreachable one.
 - [Machine configuration changes](operations-guide/machine-config-operations.md) — DNS/NTP/kernel/reboot changes cluster-wide via `machine-config-controller`.
 - [bootc-mke3 mixed clusters](operations-guide/mixed-cluster.md) — migrating from a classic MCR/MKE3 cluster to bootc-mke3.
 
