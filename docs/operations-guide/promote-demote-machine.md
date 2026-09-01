@@ -22,7 +22,7 @@ this.
    kubectl get nodes
    ```
 
-## Manager count and quorum
+### Manager count and quorum
 
 Managers form a Raft group. A group of `N` managers tolerates the loss of
 `(N-1)/2` members, so only odd counts add resilience:

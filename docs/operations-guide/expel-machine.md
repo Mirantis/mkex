@@ -32,7 +32,7 @@ before expelling a manager. Removing one of three managers leaves two, which has
 4. A decision about the machine's fate afterwards: terminate it, or reset it by
    hand. See [After removal](#after-removal-the-machine-is-orphaned).
 
-## Order matters: demote before you drain
+## Procedure
 
 > [!WARNING]
 > Never cordon a manager at the Swarm layer. `docker node update --availability
@@ -46,8 +46,6 @@ rotation. Setting `--availability active` restored it.
 Demoting first avoids this entirely — a *worker* set to `drain` stays `Ready`
 and simply stops accepting tasks. So the safe sequence is **demote, then
 cordon, then drain, then remove**.
-
-## Procedure
 
 ### 1. Identify the machine and check what it is running
 
