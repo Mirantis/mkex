@@ -23,3 +23,9 @@ Day-2 operations for a running `bootc-mke3` MKE 3 cluster: accessing it, growing
 - [Security Analysis: Cluster Management Controllers](operations-guide/controller-security-analysis.md) — trust model and risk register for `cluster-upgrade-controller` and `machine-config-controller`.
 - [Verify bootc-mke3 image signatures](operations-guide/verify-image-signatures.md) — `cosign verify` at mirroring, pull, and install/switch time.
 - [Harden MKE3 / Kubernetes](operations-guide/harden-mke3-kubernetes.md) — concrete steps to configure a secure baseline.
+
+## Troubleshooting and support
+
+- [Run privileged support containers on MKE](operations-guide/privileged-support-containers.md) — the one-time MKE grant that lets support pods run privileged on nodes; prerequisite for both runbooks below.
+- [Open a debug shell on a node](operations-guide/node-debug-shell.md) — root shell on any node via `kubectl`, with host filesystem and namespace access; no SSH.
+- [Collect support bundles from nodes](operations-guide/collect-support-bundles.md) — bulk diagnostic capture across nodes (journal, MCR, MKE 3, `bootc`, host state) to a node directory, PVC, or S3.

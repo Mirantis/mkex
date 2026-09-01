@@ -1,0 +1,56 @@
+# DEV/TEST ONLY — a PersistentVolumeClaim for exercising the capture Job's PVC
+# destination on a cluster that has no storage of its own.
+#
+#   kubectl apply -f pvc-hostpath-dev-test.yaml
+#
+# Runbook: docs/operations-guide/collect-support-bundles.md
+#
+# NOT a production destination, and NOT a shared one. The volume is a directory
+# on whichever node the capture Pod runs on, so a capture across N nodes leaves
+# N unrelated directories, each holding only that node's bundle. It does not
+# collect bundles into one place — verified on MKE 3.9.5, see the runbook's PVC
+# section. Use it to prove the destination works, or when capturing a single
+# node. For a genuinely shared destination, use storage that is really
+# ReadWriteMany (NFS, CephFS, EFS-class).
+#
+# Two details are deliberate and load-bearing:
+#
+#  * storageClassName is the empty string on BOTH objects, and the claim names
+#    its volume. That binds the claim to this volume immediately. Omitting
+#    storageClassName instead would let the default-StorageClass admission
+#    plugin rewrite the claim.
+#  * No StorageClass is created. A StorageClass with
+#    volumeBindingMode: WaitForFirstConsumer would deadlock these pods: they set
+#    spec.nodeName and so never pass through the scheduler, which is what
+#    triggers binding for that mode. Verified: the claim stays Pending forever
+#    and the Pod reports "PVC is not bound".
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: support-bundles
+spec:
+  capacity:
+    storage: 10Gi
+  # Honest about what this is. Access modes are not enforced for node-local
+  # volumes anyway — declaring ReadWriteMany here would not make the volume
+  # shared, it would only hide the fact that it is not.
+  accessModes: ["ReadWriteOnce"]
+  # Retain: a deleted claim must not take the collected bundles with it.
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /var/lib/cluster-support-pvc
+    type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: support-bundles
+  namespace: cluster-support
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+  volumeName: support-bundles
+  storageClassName: ""
