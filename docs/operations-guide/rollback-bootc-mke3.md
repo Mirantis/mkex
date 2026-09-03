@@ -43,7 +43,7 @@ the CR.
 | `bootc-os` (OS + MCR, baked into one image) | Yes | `bootc rollback` via a SUC Plan, restricted to exactly the nodes this attempt switched. Workers first, then control-plane — the reverse of the forward order. |
 | `mke3-upgrade` | Yes | `mirantis/ucp restore` against the `mke3-backup` tar taken earlier in the same attempt. |
 | `mke3-backup`, `mke3-verify-environment` | N/A | Non-mutating; nothing to undo. |
-| `mke3-docker-config` | **No** | Recorded as a `RollbackUnsupported` condition; the new daemon config stays applied. Revert manually. |
+| `mke3-docker-config` | Yes | `mke3-docker-config-rollback` runs `revert-docker-config.sh` via a SUC Plan, restoring each configured node's pre-existing `/etc/docker/daemon.json` from the `daemon.json.bak` backup (or removing the file if none existed before). Restricted to exactly the nodes the forward Plan touched. Workers first, then control-plane — same order as `bootc-os` rollback. |
 | `machine-config-controller`-managed changes (`MachineConfigChange`: DNS/NTP/kernel/etc.) | **No** | Separate controller, not touched by `ClusterUpgrade` rollback at all. Manual revert only, from each node's `<file>.mcc-orig` backup — see [R8](controller-security-analysis.md#5-consolidated-risk-register). |
 | CNI / CSI | N/A | Not a separate upgrade surface today — CNI is either baked into the bootc OS image (reverted with it) or fully unmanaged, with no independent version/rollback path. |
 
