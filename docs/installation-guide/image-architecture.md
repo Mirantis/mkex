@@ -76,15 +76,13 @@ modules are deliberately omitted — dracut and udev load those from detected
 hardware.
 
 > [!NOTE]
-> Images built from `bootc-mirantis` `main` after 2026-09-08 additionally
-> preload the modules Calico Enterprise requires: `ipip`, `ip6_tables`,
-> `ip6table_filter`, `ip6table_mangle`, `ip6table_nat`, `ip6table_raw`,
-> `ip6t_rpfilter`, `iptable_mangle`, `iptable_nat`, `iptable_raw`,
-> `xt_sctp`, `xt_ipvs`, `ip_vs`, `xt_LOG`, `nf_log_syslog`, `xt_socket`,
-> `xt_TPROXY`, `tun`, `sch_tbf`, `sch_ingress`, `cls_u32`, `act_mirred`,
-> `ifb`, `sch_htb`. Notably `ipip` — Calico's default encapsulation — was
-> not preloaded before that change. On an earlier image these must be added
-> through the extension point below, which requires a reboot.
+> The list is extended as products need it — Calico Enterprise's
+> requirements, including `ipip` for its default encapsulation mode, were
+> added on 2026-09-08 and are present in every image built after that
+> date. On an older image, a module the list does not yet carry has to be
+> added through the extension point below, which costs a reboot. Check the
+> file on the node against what your workloads need rather than assuming a
+> given release's contents.
 
 ### Adding modules
 
@@ -181,11 +179,3 @@ Controller images, manifests and pinned versions ship under
 from. They are described in
 [Post-install controllers](install-controllers.md#in-image-sources-are-the-source-of-truth)
 and not duplicated here.
-
-## Provenance
-
-Images are built from
-[`Mirantis/bootc-mirantis`](https://github.com/Mirantis/bootc-mirantis) —
-`bootc/mke3/Containerfile-template` and `bootc/mke3/static/`. That repo is
-the source of truth for what a given build ships; this document describes
-the contract, not the exact per-release contents.
