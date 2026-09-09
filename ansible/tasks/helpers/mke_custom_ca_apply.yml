@@ -1,0 +1,40 @@
+# Stages one CA type's cert/key on this host, runs `mke ca <flag>` against
+# it, then removes the staged copy. Expects loop_var `mke_ca` from
+# tasks/mke-custom-ca-tasks.yml: {ca_type, flag, cert_src, key_src}.
+# Also expects target_mke_version (tasks/helpers/get_target_mke_version.yml)
+# and mke_custom_ca_force_recent_backup to already be in scope.
+
+- name: "Resolve {{ mke_ca.ca_type }} CA cert/key content"
+  ansible.builtin.set_fact:
+    mke_ca_cert_content: "{{ lookup('file', mke_ca.cert_src) if mke_ca.cert_src is file else mke_ca.cert_src }}"
+    mke_ca_key_content: "{{ lookup('file', mke_ca.key_src) if mke_ca.key_src is file else mke_ca.key_src }}"
+  no_log: true
+
+- name: "Stage {{ mke_ca.ca_type }} CA cert/key"
+  become: true
+  ansible.builtin.copy:
+    content: "{{ item.content }}"
+    dest: "/tmp/mke-custom-ca-{{ mke_ca.ca_type }}/{{ item.name }}"
+    mode: "0600"
+  loop:
+    - { name: cert.pem, content: "{{ mke_ca_cert_content }}" }
+    - { name: key.pem, content: "{{ mke_ca_key_content }}" }
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+
+- name: "Apply custom {{ mke_ca.ca_type }} root CA"
+  become: true
+  ansible.builtin.command: >
+    docker container run --rm --security-opt label=disable
+    -v /var/run/docker.sock:/var/run/docker.sock
+    -v /tmp/mke-custom-ca-{{ mke_ca.ca_type }}/cert.pem:/ca/cert.pem
+    -v /tmp/mke-custom-ca-{{ mke_ca.ca_type }}/key.pem:/ca/key.pem
+    mirantis/ucp:{{ target_mke_version.stdout }}
+    ca {{ mke_ca.flag }}{{ ' --force-recent-backup' if mke_custom_ca_force_recent_backup | bool else '' }}
+
+- name: "Remove staged {{ mke_ca.ca_type }} CA cert/key"
+  become: true
+  ansible.builtin.file:
+    path: "/tmp/mke-custom-ca-{{ mke_ca.ca_type }}"
+    state: absent

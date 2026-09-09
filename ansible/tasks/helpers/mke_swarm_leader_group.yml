@@ -1,0 +1,18 @@
+# Dynamically groups the current host into mke_swarm_leader or
+# mke_swarm_non_leader based on live Raft leader status, so a later reboot
+# sequence can reboot the leader last as MKE docs require.
+- name: Get this node's Swarm node ID
+  become: true
+  ansible.builtin.shell: "docker info --format '{{ '{{' }}.Swarm.NodeID{{ '}}' }}'"
+  register: mke_swarm_node_id
+  changed_when: false
+
+- name: Determine Raft leader status
+  become: true
+  ansible.builtin.shell: "docker node inspect {{ mke_swarm_node_id.stdout }} --format '{{ '{{' }}.ManagerStatus.Leader{{ '}}' }}'"
+  register: mke_swarm_is_leader
+  changed_when: false
+
+- name: Group managers by leader status
+  ansible.builtin.group_by:
+    key: "mke_swarm_{{ 'leader' if mke_swarm_is_leader.stdout == 'true' else 'non_leader' }}"

@@ -1,0 +1,65 @@
+# Bring-your-own MKE internal root CA(s): replaces the Cluster, etcd, and/or
+# Client root CA with externally supplied certificate + key material.
+#
+# Standalone playbook -- run any time after MKE is installed (initial setup
+# or a later rotation). Requires SSH + docker socket access to the manager
+# nodes, so run it before this repo's post-install hardening step revokes
+# sudo/disables sshd (see mke-install-playbook.yml), or restore access first.
+#
+# Distinct from, and independent of, mke_external_certs_enabled (Option A:
+# the MKE web server/API TLS certificate, applied at install time -- see
+# tasks/mke-external-certs-tasks.yml). This playbook only touches the
+# internal CAs that issue node-to-node, etcd, and client-bundle certs.
+#
+# Mirantis strongly recommends taking a fresh backup before running this
+# (mke-backup-playbook.yml) unless mke_custom_ca_force_recent_backup is set.
+#
+# Ref: https://docs.mirantis.com/mke/3.9/ops/administer-cluster/manage-certificate-authorities.html
+# Ref: https://docs.mirantis.com/mke/3.9/cli-ref/mke-cli-ca.html
+#
+# Usage:
+#   ansible-playbook mke-custom-ca-playbook.yml \
+#     -e mke_custom_ca_cluster_enabled=true \
+#     -e mke_custom_ca_cluster_cert_src=/path/to/cluster-ca-cert.pem \
+#     -e mke_custom_ca_cluster_key_src=/path/to/cluster-ca-key.pem
+
+- name: Apply custom MKE root CA material
+  hosts: "{{ groups['managers'][0] }}"
+  gather_facts: false
+  vars_files:
+    - vars/common-vars.yml
+    - vars/mke-custom-ca-vars.yml
+  tasks:
+    - ansible.builtin.include_tasks: tasks/helpers/get_target_mke_version.yml
+    - ansible.builtin.include_tasks: tasks/mke-custom-ca-tasks.yml
+
+- name: Detect current Swarm Raft leader among managers
+  hosts: managers
+  gather_facts: false
+  vars_files:
+    - vars/common-vars.yml
+    - vars/mke-custom-ca-vars.yml
+  tasks:
+    - ansible.builtin.include_tasks: tasks/helpers/mke_swarm_leader_group.yml
+      when: >
+        mke_custom_ca_reboot_after | bool and
+        (mke_custom_ca_cluster_enabled | bool or
+         mke_custom_ca_etcd_enabled | bool or
+         mke_custom_ca_client_enabled | bool)
+
+- name: Reboot non-leader managers to apply new root CA material
+  hosts: mke_swarm_non_leader
+  gather_facts: false
+  serial: 1
+  vars_files:
+    - vars/common-vars.yml
+  tasks:
+    - ansible.builtin.include_tasks: tasks/helpers/mke_ca_reboot_and_wait.yml
+
+- name: Reboot leader manager last to apply new root CA material
+  hosts: mke_swarm_leader
+  gather_facts: false
+  vars_files:
+    - vars/common-vars.yml
+  tasks:
+    - ansible.builtin.include_tasks: tasks/helpers/mke_ca_reboot_and_wait.yml

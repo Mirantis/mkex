@@ -1,0 +1,9 @@
+# Reboots this manager node to apply newly rotated root CA material, then
+# waits for MKE to come back up before moving to the next node.
+- name: Reboot manager to apply new root CA material
+  become: true
+  ansible.builtin.reboot:
+    reboot_command: systemctl reboot
+
+- ansible.builtin.include_tasks: tasks/helpers/wait_for_mke_containers.yml
+- ansible.builtin.include_tasks: tasks/helpers/mke_status.yml

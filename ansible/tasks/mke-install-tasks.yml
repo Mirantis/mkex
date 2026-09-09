@@ -11,6 +11,12 @@
   when: mke_license != ""
   run_once: true
 
+- name: Append the --external-server-cert MKE flag to the list
+  ansible.builtin.set_fact:
+    mke_install_flags: "{{ mke_install_flags + ['--external-server-cert'] }}"
+  when: mke_external_certs_enabled | bool
+  run_once: true
+
 - ansible.builtin.include_tasks: tasks/helpers/get_target_mke_version.yml
 
 - name: Install MKE

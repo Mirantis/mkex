@@ -1,0 +1,49 @@
+# Bring-your-own MKE internal root CA(s) -- replaces one or more of MKE's
+# self-deployed Cluster / etcd / Client root CAs with externally supplied
+# certificate + key material via `mke ca --cluster/--etcd/--client`.
+#
+# This is a distinct mechanism from mke_external_certs_enabled
+# (vars/common-vars.yml), which is the MKE web server/API TLS certificate
+# applied at install time. This file governs the internal CAs that issue
+# node-to-node, etcd, and client-bundle certificates, and is applied via the
+# standalone mke-custom-ca-playbook.yml, any time after MKE is installed.
+#
+# Ref: https://docs.mirantis.com/mke/3.9/ops/administer-cluster/manage-certificate-authorities.html
+# Ref: https://docs.mirantis.com/mke/3.9/cli-ref/mke-cli-ca.html
+
+# Each toggle is independent -- enable only the CA(s) you want to replace.
+mke_custom_ca_cluster_enabled: false
+mke_custom_ca_etcd_enabled: false
+mke_custom_ca_client_enabled: false
+
+# cert.pem / key.pem for each CA. Each accepts a path to a file on the
+# Ansible controller or the literal PEM content itself (same "path or
+# content" convention as docker_daemon_config_src in common-vars.yml).
+#
+# Per Mirantis docs, each certificate/key pair must be:
+#   - a self-signed root certificate -- intermediate certificates are not
+#     allowed
+#   - in PEM format, with the key unencrypted (no passphrase)
+# and each certificate's Common Name must match exactly:
+#   - Cluster CA:  swarm-ca
+#   - etcd CA:     MKE etcd Root CA
+#   - Client CA:   UCP Client Root CA
+mke_custom_ca_cluster_cert_src: ""
+mke_custom_ca_cluster_key_src: ""
+mke_custom_ca_etcd_cert_src: ""
+mke_custom_ca_etcd_key_src: ""
+mke_custom_ca_client_cert_src: ""
+mke_custom_ca_client_key_src: ""
+
+# Passed as --force-recent-backup to the `ca` command, bypassing MKE's
+# built-in check that a recent backup exists. Only set this true if you have
+# deliberately decided to skip a backup (e.g. a brand-new cluster with no
+# data yet) -- otherwise take a backup first (mke-backup-playbook.yml) and
+# leave this false.
+mke_custom_ca_force_recent_backup: false
+
+# Applying new root CA material requires rebooting every manager node, one
+# at a time, with the current Raft leader rebooted last. Set false to skip
+# the automatic reboot and perform it manually during a chosen maintenance
+# window instead -- the CA change will not take effect until reboot happens.
+mke_custom_ca_reboot_after: true

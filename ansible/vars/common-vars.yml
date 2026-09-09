@@ -22,6 +22,34 @@ mke_install_flags:
     "--force-minimums",
   ]
 
+# Use your own TLS certificate for the MKE web server/API instead of the
+# self-signed certificate MKE generates. Applied only at install time, via
+# `--external-server-cert` (tasks/mke-external-certs-tasks.yml populates the
+# ucp-controller-server-certs volume before install runs). Changing this
+# after MKE is already installed does NOT rotate the live certificate --
+# that requires the MKE web UI (Admin Settings > Certificates) per Mirantis
+# docs, or a fresh install.
+#
+# This is unrelated to mke_custom_ca_*_enabled (vars/mke-custom-ca-vars.yml),
+# which replaces MKE's internal Cluster/etcd/Client root CAs, not the
+# web-facing server certificate.
+#
+# Ref: https://docs.mirantis.com/mke/3.9/install/predeployment/use-ext-ca.html
+# Ref: https://docs.mirantis.com/mke/3.9/cli-ref/mke-cli-install.html
+mke_external_certs_enabled: false
+
+# ca.pem / cert.pem / key.pem for the MKE web server certificate. Each
+# accepts either a path to a file on the Ansible controller or the literal
+# PEM content itself (same "path or content" convention as
+# docker_daemon_config_src below). cert.pem MUST already include SANs for
+# mke_url and any load balancer address used to reach MKE -- MKE does not
+# add SANs to a certificate you supply. A single shared cert/key is copied
+# to every manager; MKE auto-propagates it to managers that join or get
+# promoted later. Ignored unless mke_external_certs_enabled is true.
+mke_external_ca_src: ""
+mke_external_cert_src: ""
+mke_external_key_src: ""
+
 # The appointed manager node used as a lead node
 main_manager: "{{ groups['managers'][0] }}"
 
