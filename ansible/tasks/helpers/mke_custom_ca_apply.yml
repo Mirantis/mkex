@@ -10,6 +10,13 @@
     mke_ca_key_content: "{{ lookup('file', mke_ca.key_src) if mke_ca.key_src is file else mke_ca.key_src }}"
   no_log: true
 
+- name: "Create {{ mke_ca.ca_type }} CA staging directory"
+  become: true
+  ansible.builtin.file:
+    path: "/tmp/mke-custom-ca-{{ mke_ca.ca_type }}"
+    state: directory
+    mode: "0700"
+
 - name: "Stage {{ mke_ca.ca_type }} CA cert/key"
   become: true
   ansible.builtin.copy:
