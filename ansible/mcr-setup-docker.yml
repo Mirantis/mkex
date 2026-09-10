@@ -2,7 +2,7 @@
   hosts: all
   gather_facts: false
   vars_files:
-    - common-vars.yml
+    - vars/common-vars.yml
   vars:
     docker_daemon: "{{ lookup('file', docker_daemon_config_src) if docker_daemon_config_src is file else docker_daemon_config_src }}"
   tasks:

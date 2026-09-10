@@ -17,7 +17,7 @@
 - name: Upgrade OS with bootc for managers
   hosts: managers
   vars_files:
-    - upgrade-vars.yml
+    - vars/upgrade-vars.yml
   serial: 1
   gather_facts: false
   tasks:
@@ -26,8 +26,8 @@
 - name: Upgrade OS with bootc for workers
   hosts: workers
   vars_files:
-    - common-vars.yml
-    - upgrade-vars.yml
+    - vars/common-vars.yml
+    - vars/upgrade-vars.yml
   serial: "{{ upgrade_worker_batch_size | default(1) }}"
   gather_facts: false
   tasks:
@@ -45,7 +45,7 @@
   hosts: all
   gather_facts: false
   vars_files:
-    - upgrade-vars.yml
+    - vars/upgrade-vars.yml
   tasks:
     - ansible.builtin.include_tasks: tasks/helpers/get_current_mke_version.yml
     - ansible.builtin.include_tasks: tasks/helpers/get_target_mke_version.yml
@@ -56,7 +56,7 @@
   hosts: managers
   gather_facts: false
   vars_files:
-    - upgrade-vars.yml
+    - vars/upgrade-vars.yml
   tasks:
     - ansible.builtin.include_tasks: tasks/helpers/get_current_mke_version.yml
     - ansible.builtin.include_tasks: tasks/helpers/get_target_mke_version.yml
