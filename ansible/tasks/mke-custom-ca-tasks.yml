@@ -1,0 +1,26 @@
+# Applies externally supplied root CA material for each enabled CA type.
+# Expects to run on a single host (groups['managers'][0]) -- the `ca`
+# command is a Swarm/cluster-wide operation, not a per-node one; MKE docs
+# describe running it from "one of the manager nodes of your cluster".
+- name: Apply custom root CA material
+  ansible.builtin.include_tasks: tasks/helpers/mke_custom_ca_apply.yml
+  loop:
+    - ca_type: cluster
+      flag: --cluster
+      enabled: "{{ mke_custom_ca_cluster_enabled | bool }}"
+      cert_src: "{{ mke_custom_ca_cluster_cert_src }}"
+      key_src: "{{ mke_custom_ca_cluster_key_src }}"
+    - ca_type: etcd
+      flag: --etcd
+      enabled: "{{ mke_custom_ca_etcd_enabled | bool }}"
+      cert_src: "{{ mke_custom_ca_etcd_cert_src }}"
+      key_src: "{{ mke_custom_ca_etcd_key_src }}"
+    - ca_type: client
+      flag: --client
+      enabled: "{{ mke_custom_ca_client_enabled | bool }}"
+      cert_src: "{{ mke_custom_ca_client_cert_src }}"
+      key_src: "{{ mke_custom_ca_client_key_src }}"
+  loop_control:
+    loop_var: mke_ca
+    label: "{{ mke_ca.ca_type }}"
+  when: mke_ca.enabled

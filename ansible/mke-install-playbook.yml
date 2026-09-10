@@ -43,6 +43,7 @@
     - vars/common-vars.yml
     - vars/mke-creds.yml
   tasks:
+    - ansible.builtin.include_tasks: tasks/mke-external-certs-tasks.yml
     - ansible.builtin.include_tasks: tasks/mke-install-tasks.yml
 
 

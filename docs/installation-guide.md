@@ -14,6 +14,7 @@ This guide covers everything needed to go from bare infrastructure to a running 
 ## Installing bootc-mke3
 
 - [Install bootc-mke3](installation-guide/install-bootc-mke3.md) — run the Ansible installer against a provisioned inventory.
+- [Use your own TLS certificate for MKE](installation-guide/use-custom-tls-certificates.md) — install MKE with a custom web-server/API certificate instead of the self-signed default.
 - [Post-install controllers](installation-guide/install-controllers.md) — what the System Upgrade Controller, `cluster-upgrade-controller`, and `machine-config-controller` deploy by default, and how to verify them.
 - [Air-gapped bootc-mke3](installation-guide/airgap-bootc-mke3.md) — what must be mirrored to an internal registry and the Ansible variables to repoint.
 

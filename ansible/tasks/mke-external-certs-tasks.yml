@@ -1,0 +1,49 @@
+# Seeds the ucp-controller-server-certs Docker volume with an externally
+# supplied TLS certificate for the MKE web server/API, so the subsequent
+# `install --external-server-cert` (tasks/mke-install-tasks.yml) picks it up.
+#
+# Must run before MKE install. Runs on every manager and writes an identical
+# copy of the cert bundle to each one: MKE auto-propagates a single shared
+# cert to managers that join/get promoted after install, but at initial
+# bring-up every manager already joined swarm before MKE itself is
+# installed, so seeding all of them up front is the only way to guarantee
+# every manager has the bundle in place regardless of propagation timing.
+#
+# Ref: https://docs.mirantis.com/mke/3.9/install/predeployment/use-ext-ca.html
+# Ref: https://docs.mirantis.com/mke/3.9/cli-ref/mke-cli-install.html
+
+- name: Resolve external cert material (path or literal content)
+  ansible.builtin.set_fact:
+    mke_external_ca_content: "{{ lookup('file', mke_external_ca_src) if mke_external_ca_src is file else mke_external_ca_src }}"
+    mke_external_cert_content: "{{ lookup('file', mke_external_cert_src) if mke_external_cert_src is file else mke_external_cert_src }}"
+    mke_external_key_content: "{{ lookup('file', mke_external_key_src) if mke_external_key_src is file else mke_external_key_src }}"
+  no_log: true
+  when: mke_external_certs_enabled | bool
+
+- name: Create the ucp-controller-server-certs volume
+  ansible.builtin.command: docker volume create ucp-controller-server-certs
+  become: true
+  changed_when: false
+  when: mke_external_certs_enabled | bool
+
+- name: Get ucp-controller-server-certs volume mountpoint
+  ansible.builtin.command: "docker volume inspect --format '{{ '{{' }}.Mountpoint{{ '}}' }}' ucp-controller-server-certs"
+  become: true
+  register: mke_external_certs_mountpoint
+  changed_when: false
+  when: mke_external_certs_enabled | bool
+
+- name: Write ca.pem/cert.pem/key.pem into the ucp-controller-server-certs volume
+  become: true
+  ansible.builtin.copy:
+    content: "{{ item.content }}"
+    dest: "{{ mke_external_certs_mountpoint.stdout }}/{{ item.name }}"
+    mode: "0600"
+  loop:
+    - { name: ca.pem, content: "{{ mke_external_ca_content }}" }
+    - { name: cert.pem, content: "{{ mke_external_cert_content }}" }
+    - { name: key.pem, content: "{{ mke_external_key_content }}" }
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+  when: mke_external_certs_enabled | bool
