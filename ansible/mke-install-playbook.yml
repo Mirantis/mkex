@@ -16,7 +16,7 @@
   hosts: managers
   gather_facts: false
   vars_files:
-    - common-vars.yml
+    - vars/common-vars.yml
   tasks:
     - ansible.builtin.include_tasks: tasks/swarm-init-tasks.yml
 
@@ -33,7 +33,7 @@
   gather_facts: false
   hosts: workers
   vars_files:
-    - common-vars.yml
+    - vars/common-vars.yml
   tasks:
     - ansible.builtin.include_tasks: tasks/swarm-join-workers-tasks.yml
 
